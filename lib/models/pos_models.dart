@@ -217,3 +217,68 @@ class ShiftReportData {
     required this.expenses,
   });
 }
+
+class DailySummary {
+  final DateTime date;
+  final String dayLabel;
+  final double omzet;
+  final double expenses;
+  final int orderCount;
+
+  double get bersih => omzet - expenses;
+
+  DailySummary({
+    required this.date,
+    required this.dayLabel,
+    required this.omzet,
+    required this.expenses,
+    required this.orderCount,
+  });
+}
+
+class TopItemSummary {
+  final String itemName;
+  final int totalQty;
+  final double totalRevenue;
+
+  TopItemSummary({
+    required this.itemName,
+    required this.totalQty,
+    required this.totalRevenue,
+  });
+}
+
+class PeriodicReportData {
+  final DateTime startDate;
+  final DateTime endDate;
+  final double totalOmzet;
+  final double totalExpenses;
+  final double bersih;
+  final int totalOrders;
+  final double totalCash;
+  final double totalQris;
+  final int cashOrderCount;
+  final int qrisOrderCount;
+  final List<DailySummary> dailySummaries;
+  final List<TopItemSummary> topItems;
+  final List<Expense> expenses;
+  final List<Order> orders;
+
+  PeriodicReportData({
+    required this.startDate,
+    required this.endDate,
+    required this.totalOmzet,
+    required this.totalExpenses,
+    required this.bersih,
+    required this.totalOrders,
+    required this.totalCash,
+    required this.totalQris,
+    required this.cashOrderCount,
+    required this.qrisOrderCount,
+    required this.dailySummaries,
+    required this.topItems,
+    required this.expenses,
+    required this.orders,
+  });
+}
+

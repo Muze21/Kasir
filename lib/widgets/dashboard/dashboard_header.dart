@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../screens/periodic_report_screen.dart';
 
 class DashboardHeader extends StatelessWidget {
   final VoidCallback onRefresh;
@@ -92,6 +93,16 @@ class DashboardHeader extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.bar_chart_rounded, size: 21, color: Color(0xFF0F172A)),
+          tooltip: 'Laporan Toko',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PeriodicReportScreen()),
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.sync_outlined, size: 20, color: Color(0xFF64748B)),
           tooltip: 'Sinkronkan Data',

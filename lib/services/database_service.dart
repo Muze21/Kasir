@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import '../models/pos_models.dart';
 import '../config/supabase_config.dart';
 
@@ -260,6 +261,132 @@ class DatabaseService {
       expenses: expenses,
     );
   }
+
+  // LAPORAN BERKALA (MINGGUAN / BULANAN / HARIAN)
+  Future<PeriodicReportData> getPeriodicReport({
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final startIso = startDate.toUtc().toIso8601String();
+    final endIso = endDate.toUtc().toIso8601String();
+
+    // 1. Ambil orders dalam rentang waktu
+    final ordersRes = await _supabase
+        .from('orders')
+        .select('*, profiles(id, full_name), order_items(*)')
+        .gte('created_at', startIso)
+        .lte('created_at', endIso)
+        .order('created_at', ascending: true);
+
+    final orders = (ordersRes as List).map((j) => Order.fromJson(j)).toList();
+
+    // 2. Ambil expenses dalam rentang waktu
+    final expensesRes = await _supabase
+        .from('expenses')
+        .select('*, profiles(id, full_name)')
+        .gte('created_at', startIso)
+        .lte('created_at', endIso)
+        .order('created_at', ascending: true);
+
+    final expenses = (expensesRes as List).map((j) => Expense.fromJson(j)).toList();
+
+    // 3. Hitung total finansial
+    double totalOmzet = 0;
+    double totalCash = 0;
+    double totalQris = 0;
+    int cashCount = 0;
+    int qrisCount = 0;
+
+    for (final o in orders) {
+      totalOmzet += o.totalAmount;
+      if (o.paymentMethod == 'qris') {
+        totalQris += o.totalAmount;
+        qrisCount++;
+      } else {
+        totalCash += o.totalAmount;
+        cashCount++;
+      }
+    }
+
+    double totalExpenses = 0;
+    for (final e in expenses) {
+      totalExpenses += e.amount;
+    }
+
+    // 4. Hitung Top Selling Items (Menu Terlaris)
+    final Map<String, _ItemAgg> itemMap = {};
+    for (final o in orders) {
+      for (final item in o.items) {
+        final name = item.itemName;
+        itemMap.putIfAbsent(name, () => _ItemAgg(itemName: name));
+        itemMap[name]!.totalQty += item.qty;
+        itemMap[name]!.totalRevenue += item.subtotal;
+      }
+    }
+    final topItems = itemMap.values
+        .map((i) => TopItemSummary(
+              itemName: i.itemName,
+              totalQty: i.totalQty,
+              totalRevenue: i.totalRevenue,
+            ))
+        .toList()
+      ..sort((a, b) => b.totalQty.compareTo(a.totalQty));
+
+    // 5. Agregasi Harian (Daily Summary) untuk grafik
+    final Map<String, _DailyAgg> dailyMap = {};
+    DateTime cursor = DateTime(startDate.year, startDate.month, startDate.day);
+    final endDay = DateTime(endDate.year, endDate.month, endDate.day);
+    while (!cursor.isAfter(endDay)) {
+      final key = '${cursor.year}-${cursor.month.toString().padLeft(2, '0')}-${cursor.day.toString().padLeft(2, '0')}';
+      dailyMap[key] = _DailyAgg(date: cursor);
+      cursor = cursor.add(const Duration(days: 1));
+    }
+
+    for (final o in orders) {
+      final localDate = o.createdAt.toLocal();
+      final key = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
+      if (dailyMap.containsKey(key)) {
+        dailyMap[key]!.omzet += o.totalAmount;
+        dailyMap[key]!.orderCount += 1;
+      }
+    }
+
+    for (final e in expenses) {
+      final localDate = e.createdAt.toLocal();
+      final key = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
+      if (dailyMap.containsKey(key)) {
+        dailyMap[key]!.expenses += e.amount;
+      }
+    }
+
+    final dayFmt = DateFormat('E, d MMM', 'id_ID');
+    final dailySummaries = dailyMap.values.map((d) {
+      return DailySummary(
+        date: d.date,
+        dayLabel: dayFmt.format(d.date),
+        omzet: d.omzet,
+        expenses: d.expenses,
+        orderCount: d.orderCount,
+      );
+    }).toList();
+
+    return PeriodicReportData(
+      startDate: startDate,
+      endDate: endDate,
+      totalOmzet: totalOmzet,
+      totalExpenses: totalExpenses,
+      bersih: totalOmzet - totalExpenses,
+      totalOrders: orders.length,
+      totalCash: totalCash,
+      totalQris: totalQris,
+      cashOrderCount: cashCount,
+      qrisOrderCount: qrisCount,
+      dailySummaries: dailySummaries,
+      topItems: topItems,
+      expenses: expenses,
+      orders: orders,
+    );
+  }
 }
 
 class _UserStatsAcc {
@@ -270,4 +397,19 @@ class _UserStatsAcc {
   double expenses = 0;
 
   _UserStatsAcc({required this.userId, required this.userName});
+}
+
+class _ItemAgg {
+  final String itemName;
+  int totalQty = 0;
+  double totalRevenue = 0;
+  _ItemAgg({required this.itemName});
+}
+
+class _DailyAgg {
+  final DateTime date;
+  double omzet = 0;
+  double expenses = 0;
+  int orderCount = 0;
+  _DailyAgg({required this.date});
 }
