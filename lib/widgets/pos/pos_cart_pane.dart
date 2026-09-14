@@ -332,16 +332,22 @@ class PosCartPane extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Quick Cash Denomination Chips
+            // Quick Cash Denomination Chips (Dinamis sesuai total belanja)
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
-                _buildQuickCashChip('Uang Pas', cartTotal),
-                _buildQuickCashChip('10rb', 10000),
-                _buildQuickCashChip('20rb', 20000),
-                _buildQuickCashChip('50rb', 50000),
-                _buildQuickCashChip('100rb', 100000),
+                if (cartTotal > 0) ...[
+                  _buildQuickCashChip('Uang Pas', cartTotal),
+                  ..._getSmartCashSuggestions(cartTotal).map(
+                    (val) => _buildQuickCashChip(_formatNominalLabel(val), val),
+                  ),
+                ] else ...[
+                  _buildQuickCashChip('10rb', 10000),
+                  _buildQuickCashChip('20rb', 20000),
+                  _buildQuickCashChip('50rb', 50000),
+                  _buildQuickCashChip('100rb', 100000),
+                ],
               ],
             ),
             const SizedBox(height: 10),
@@ -457,5 +463,51 @@ class PosCartPane extends StatelessWidget {
         cashInputCtrl.text = value.toStringAsFixed(0);
       },
     );
+  }
+
+  List<double> _getSmartCashSuggestions(double total) {
+    if (total <= 0) return [];
+    final Set<double> suggestions = {};
+
+    // 1. Pembulatan ke kelipatan 5rb / 10rb terdekat di atas total
+    final ceil5k = (total / 5000).ceil() * 5000.0;
+    if (ceil5k > total) suggestions.add(ceil5k);
+
+    final ceil10k = (total / 10000).ceil() * 10000.0;
+    if (ceil10k > total) suggestions.add(ceil10k);
+
+    final ceil20k = (total / 20000).ceil() * 20000.0;
+    if (ceil20k > total) suggestions.add(ceil20k);
+
+    // 2. Lembaran uang standar Indonesia (10rb, 20rb, 50rb, 100rb) yang lebih besar dari total
+    const standardNotes = [10000.0, 20000.0, 50000.0, 100000.0];
+    for (final note in standardNotes) {
+      if (note > total) {
+        suggestions.add(note);
+      }
+    }
+
+    // Jika total di atas 100rb (misal 130rb), tambahkan opsi 150rb, 200rb
+    if (total > 100000) {
+      final ceil50k = (total / 50000).ceil() * 50000.0;
+      if (ceil50k > total) suggestions.add(ceil50k);
+      final ceil100k = (total / 100000).ceil() * 100000.0;
+      if (ceil100k > total) suggestions.add(ceil100k);
+    }
+
+    final sorted = suggestions.toList()..sort();
+    return sorted.take(4).toList();
+  }
+
+  String _formatNominalLabel(double value) {
+    if (value >= 1000000) {
+      final jt = value / 1000000;
+      return jt == jt.roundToDouble() ? '${jt.toInt()}jt' : '${jt.toStringAsFixed(1)}jt';
+    }
+    if (value >= 1000) {
+      final rb = value / 1000;
+      return rb == rb.roundToDouble() ? '${rb.toInt()}rb' : '${rb.toStringAsFixed(1)}rb';
+    }
+    return value.toStringAsFixed(0);
   }
 }

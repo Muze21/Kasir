@@ -45,6 +45,9 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
+    _cashInputCtrl.addListener(() {
+      if (mounted) setState(() {});
+    });
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _currentTime = DateTime.now());
@@ -138,10 +141,12 @@ class _PosScreenState extends State<PosScreen> {
     try {
       final orderItems = _cart.map((item) {
         final price = (item['price'] as num).toDouble();
-        final qty = item['qty'] as int;
+        final qty = (item['qty'] as num).toInt();
         return {
+          'name': item['name'] as String,
           'item_name': item['name'] as String,
           'price': price,
+          'qty': qty,
           'quantity': qty,
           'subtotal': price * qty,
         };
@@ -158,6 +163,7 @@ class _PosScreenState extends State<PosScreen> {
         total: totalPaid,
         paymentMethod: payMethod,
         items: orderItems,
+        customerName: customerName.isNotEmpty ? customerName : null,
       );
 
       if (!mounted) return;

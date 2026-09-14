@@ -111,28 +111,48 @@ class DatabaseService {
     required List<Map<String, dynamic>> items,
     String? customerName,
   }) async {
-    // 1. Insert order
+    // 1. Hitung nomor antrean berikutnya di shift ini
+    final existingOrders = await _supabase
+        .from('orders')
+        .select('id')
+        .eq('shift_id', shiftId);
+    final nextQueueNumber = (existingOrders as List).length + 1;
+
+    // 2. Insert order
     final orderRes = await _supabase.from('orders').insert({
       'shift_id': shiftId,
       'total_amount': total,
       'payment_method': paymentMethod, // 'cash' atau 'qris'
       'customer_name': (customerName != null && customerName.isNotEmpty) ? customerName : null,
       'user_id': currentUserId,
+      'queue_number': nextQueueNumber,
     }).select().single();
 
     final orderId = orderRes['id'];
 
-    // 2. Insert items
-    final orderItems = items.map((item) => {
-      'order_id': orderId,
-      'item_name': item['name'],
-      'qty': item['qty'],
-      'price': item['price'],
-      'subtotal': (item['qty'] as int) * (item['price'] as double),
+    // 3. Insert items
+    final orderItems = items.map((item) {
+      final name = (item['item_name'] ?? item['name'] ?? 'Item').toString();
+      final rawQty = item['qty'] ?? item['quantity'] ?? 1;
+      final rawPrice = item['price'] ?? 0;
+      final qty = (rawQty is num) ? rawQty.toInt() : (int.tryParse(rawQty.toString()) ?? 1);
+      final price = (rawPrice is num) ? rawPrice.toDouble() : (double.tryParse(rawPrice.toString()) ?? 0.0);
+      final rawSubtotal = item['subtotal'];
+      final subtotal = (rawSubtotal is num) ? rawSubtotal.toDouble() : (qty * price);
+
+      return {
+        'order_id': orderId,
+        'item_name': name,
+        'qty': qty,
+        'price': price,
+        'subtotal': subtotal,
+      };
     }).toList();
 
     await _supabase.from('order_items').insert(orderItems);
-    return orderRes['queue_number'] as int;
+
+    final rawQueue = orderRes['queue_number'];
+    return (rawQueue is num) ? rawQueue.toInt() : nextQueueNumber;
   }
 
   // CATAT PENGELUARAN (CREATE EXPENSE)

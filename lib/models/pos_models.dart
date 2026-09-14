@@ -133,7 +133,7 @@ class Order {
 
     return Order(
       id: json['id'] as String,
-      queueNumber: json['queue_number'] as int,
+      queueNumber: (json['queue_number'] as num?)?.toInt() ?? 0,
       customerName: json['customer_name'] as String?,
       totalAmount: (json['total_amount'] as num).toDouble(),
       paymentMethod: (json['payment_method'] as String?) ?? 'cash',
