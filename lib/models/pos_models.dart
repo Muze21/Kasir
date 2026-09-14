@@ -2,15 +2,52 @@ class Shift {
   final String id;
   final DateTime openedAt;
   final String status;
+  final String? openedBy;
+  final String? closedBy;
+  final DateTime? closedAt;
 
-  Shift({required this.id, required this.openedAt, required this.status});
+  Shift({
+    required this.id,
+    required this.openedAt,
+    required this.status,
+    this.openedBy,
+    this.closedBy,
+    this.closedAt,
+  });
+
+  bool get isOpen => status == 'open';
 
   factory Shift.fromJson(Map<String, dynamic> json) {
     return Shift(
       id: json['id'] as String,
-      openedAt: DateTime.parse(json['opened_at'] as String),
+      openedAt: DateTime.parse(json['opened_at'] as String).toLocal(),
       status: json['status'] as String,
+      openedBy: json['opened_by'] as String?,
+      closedBy: json['closed_by'] as String?,
+      closedAt: json['closed_at'] != null ? DateTime.parse(json['closed_at'] as String).toLocal() : null,
     );
+  }
+}
+
+class ShiftStats {
+  final int orderCount;
+  final double omzet;
+  final double expenses;
+  final double bersih;
+
+  ShiftStats({required this.orderCount, required this.omzet, required this.expenses})
+      : bersih = omzet - expenses;
+
+  factory ShiftStats.fromData({required int orderCount, required List<dynamic> orders, required List<dynamic> expenses}) {
+    var omzet = 0.0;
+    for (final o in orders) {
+      omzet += (o['total_amount'] as num).toDouble();
+    }
+    var exp = 0.0;
+    for (final e in expenses) {
+      exp += (e['amount'] as num).toDouble();
+    }
+    return ShiftStats(orderCount: orderCount, omzet: omzet, expenses: exp);
   }
 }
 
@@ -55,7 +92,7 @@ class Order {
       totalAmount: (json['total_amount'] as num).toDouble(),
       userId: json['user_id'] as String,
       profile: json['profiles'] != null ? Profile.fromJson(json['profiles']) : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
     );
   }
 }
@@ -84,7 +121,7 @@ class Expense {
       amount: (json['amount'] as num).toDouble(),
       userId: json['user_id'] as String,
       profile: json['profiles'] != null ? Profile.fromJson(json['profiles']) : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
     );
   }
 }

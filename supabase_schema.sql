@@ -1,5 +1,5 @@
 -- ============================================================
--- KASKITA / PundiKeluarga - SUPABASE SCHEMA LENGKAP (1 file)
+-- KASKITA - SUPABASE SCHEMA LENGKAP (1 file)
 -- Cukup jalankan file ini SEKALI di SQL Editor.
 -- ============================================================
 

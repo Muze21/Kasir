@@ -33,6 +33,33 @@ class DatabaseService {
     return res != null ? Shift.fromJson(res) : null;
   }
 
+  // GET SHIFT STATS (summary buat dashboard)
+  Future<ShiftStats> getShiftStats(String shiftId) async {
+    final orders = await _supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('shift_id', shiftId);
+    final expenses = await _supabase
+        .from('expenses')
+        .select('amount')
+        .eq('shift_id', shiftId);
+    return ShiftStats.fromData(
+      orderCount: (orders as List).length,
+      orders: orders as List,
+      expenses: expenses as List,
+    );
+  }
+
+  // GET PROFILE BY ID (buat "Dibuka oleh")
+  Future<Profile?> getProfileById(String id) async {
+    final res = await _supabase
+        .from('profiles')
+        .select()
+        .eq('id', id)
+        .maybeSingle();
+    return res != null ? Profile.fromJson(res) : null;
+  }
+
   // OPEN SHIFT
   Future<Shift> openShift() async {
     final res = await _supabase.from('shifts').insert({
