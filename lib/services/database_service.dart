@@ -63,6 +63,19 @@ class DatabaseService {
     return (res as List).map((json) => Shift.fromJson(json)).toList();
   }
 
+  // GET SHIFT TUTUP TERAKHIR
+  Future<Shift?> getLastClosedShift() async {
+    final res = await _supabase
+        .from('shifts')
+        .select('*, opener:profiles!opened_by(*), closer:profiles!closed_by(*)')
+        .eq('status', 'closed')
+        .order('closed_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+
+    return res != null ? Shift.fromJson(res) : null;
+  }
+
   // GET SHIFT STATS SEMENTARA
   Future<ShiftStats> getShiftStats(String shiftId) async {
     final orders = await _supabase
@@ -91,7 +104,7 @@ class DatabaseService {
   }
 
   // BUAT TRANSAKSI (CREATE ORDER + ITEMS)
-  Future<void> createOrder({
+  Future<int> createOrder({
     required String shiftId,
     required double total,
     required String paymentMethod,
@@ -119,6 +132,7 @@ class DatabaseService {
     }).toList();
 
     await _supabase.from('order_items').insert(orderItems);
+    return orderRes['queue_number'] as int;
   }
 
   // CATAT PENGELUARAN (CREATE EXPENSE)
