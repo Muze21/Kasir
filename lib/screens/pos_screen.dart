@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../models/pos_models.dart';
 import '../services/database_service.dart';
 import '../widgets/pos/pos_cart_pane.dart';
 import '../widgets/pos/pos_catalog_pane.dart';
+import '../widgets/pos/pos_order_history_dialog.dart';
 import '../widgets/pos/pos_ticket_dialog.dart';
 import '../widgets/pos/pos_top_bar.dart';
 import 'manage_menu_screen.dart';
@@ -90,6 +92,8 @@ class _PosScreenState extends State<PosScreen> {
     super.dispose();
   }
 
+  static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+
   // Perhitungan Keranjang
   double get _cartTotal => _cart.fold(
         0.0,
@@ -97,6 +101,16 @@ class _PosScreenState extends State<PosScreen> {
       );
 
   int get _cartItemCount => _cart.fold(0, (sum, item) => sum + (item['qty'] as int));
+
+  Map<String, int> get _cartItemCounts {
+    final map = <String, int>{};
+    for (final item in _cart) {
+      final name = item['name'] as String;
+      final qty = (item['qty'] as num).toInt();
+      map[name] = (map[name] ?? 0) + qty;
+    }
+    return map;
+  }
 
   double get _cashReceived {
     final clean = _cashInputCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -250,6 +264,111 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  void _openMobileCheckoutSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (sheetContext, setModalState) {
+          return Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.90,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag Handle
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 38,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                // Header Sheet
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.shopping_bag_outlined, size: 20, color: Color(0xFF0F172A)),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Keranjang & Pembayaran ($_cartItemCount)',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20, color: Color(0xFF64748B)),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                // Content PosCartPane
+                Flexible(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: PosCartPane(
+                      cart: _cart,
+                      onClearCart: () {
+                        _clearCart();
+                        setModalState(() {});
+                        if (_cart.isEmpty) Navigator.pop(ctx);
+                      },
+                      onUpdateQty: (idx, delta) {
+                        _updateCartQty(idx, delta);
+                        setModalState(() {});
+                        if (_cart.isEmpty) Navigator.pop(ctx);
+                      },
+                      onRemoveItem: (idx) {
+                        _removeFromCart(idx);
+                        setModalState(() {});
+                        if (_cart.isEmpty) Navigator.pop(ctx);
+                      },
+                      paymentMethod: _paymentMethod,
+                      onPaymentMethodChanged: (m) {
+                        setState(() => _paymentMethod = m);
+                        setModalState(() {});
+                      },
+                      cashInputCtrl: _cashInputCtrl,
+                      cartTotal: _cartTotal,
+                      cartItemCount: _cartItemCount,
+                      cashReceived: _cashReceived,
+                      cashChange: _cashChange,
+                      isSubmitting: _isSubmitting,
+                      onSubmitOrder: () {
+                        Navigator.pop(ctx);
+                        _submitOrder();
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // Tutup Toko
   Future<void> _closeShift() async {
     final confirm = await showDialog<bool>(
@@ -284,6 +403,35 @@ class _PosScreenState extends State<PosScreen> {
     }
   }
 
+  void _openOrderHistory() {
+    final isMobile = MediaQuery.of(context).size.width < 640;
+    if (isMobile) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => PosOrderHistoryDialog(
+          shiftId: widget.shift.id,
+          isBottomSheet: true,
+          onOrderVoided: () {
+            if (mounted) setState(() {});
+          },
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (_) => PosOrderHistoryDialog(
+          shiftId: widget.shift.id,
+          isBottomSheet: false,
+          onOrderVoided: () {
+            if (mounted) setState(() {});
+          },
+        ),
+      );
+    }
+  }
+
   void _viewReport() {
     Navigator.push(
       context,
@@ -298,6 +446,7 @@ class _PosScreenState extends State<PosScreen> {
       appBar: PosTopBar(
         shift: widget.shift,
         currentTime: _currentTime,
+        onOpenOrderHistory: _openOrderHistory,
         onViewReport: _viewReport,
         onCloseShift: _closeShift,
       ),
@@ -323,6 +472,7 @@ class _PosScreenState extends State<PosScreen> {
                       onAddToCart: _addToCart,
                       presetItems: _presetItems,
                       onManageMenu: _openManageMenu,
+                      cartItemCounts: _cartItemCounts,
                     ),
                   ),
                 ),
@@ -354,38 +504,111 @@ class _PosScreenState extends State<PosScreen> {
             );
           }
 
-          // Layout Mobile / Layar Sempit (Stacked Vertically)
+          // Layout Mobile: Full Screen Catalog (Bebas Scroll Naik-Turun)
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                PosCatalogPane(
-                  customerNameCtrl: _customerNameCtrl,
-                  customNameCtrl: _customNameCtrl,
-                  customPriceCtrl: _customPriceCtrl,
-                  customQty: _customQty,
-                  onCustomQtyChanged: (q) => setState(() => _customQty = q),
-                  onAddToCart: _addToCart,
-                  presetItems: _presetItems,
-                  onManageMenu: _openManageMenu,
-                ),
-                const SizedBox(height: 16),
-                PosCartPane(
-                  cart: _cart,
-                  onClearCart: _clearCart,
-                  onUpdateQty: _updateCartQty,
-                  onRemoveItem: _removeFromCart,
-                  paymentMethod: _paymentMethod,
-                  onPaymentMethodChanged: (m) => setState(() => _paymentMethod = m),
-                  cashInputCtrl: _cashInputCtrl,
-                  cartTotal: _cartTotal,
-                  cartItemCount: _cartItemCount,
-                  cashReceived: _cashReceived,
-                  cashChange: _cashChange,
-                  isSubmitting: _isSubmitting,
-                  onSubmitOrder: _submitOrder,
+            padding: EdgeInsets.fromLTRB(16, 16, 16, _cart.isNotEmpty ? 100 : 24),
+            child: PosCatalogPane(
+              customerNameCtrl: _customerNameCtrl,
+              customNameCtrl: _customNameCtrl,
+              customPriceCtrl: _customPriceCtrl,
+              customQty: _customQty,
+              onCustomQtyChanged: (q) => setState(() => _customQty = q),
+              onAddToCart: _addToCart,
+              presetItems: _presetItems,
+              onManageMenu: _openManageMenu,
+              cartItemCounts: _cartItemCounts,
+            ),
+          );
+        },
+      ),
+      bottomNavigationBar: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = MediaQuery.of(context).size.width >= 820;
+          if (isWide || _cart.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(20),
+                  blurRadius: 16,
+                  offset: const Offset(0, -4),
                 ),
               ],
+              border: const Border(
+                top: BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+            ),
+            child: SafeArea(
+              child: Row(
+                children: [
+                  // Info Jumlah Item & Total Belanja
+                  InkWell(
+                    onTap: _openMobileCheckoutSheet,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  '$_cartItemCount item',
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                'Total:',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _rupiah.format(_cartTotal),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF059669),
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  // Tombol Bayar
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    onPressed: _openMobileCheckoutSheet,
+                    icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 18),
+                    label: const Text(
+                      'BAYAR ➔',
+                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },

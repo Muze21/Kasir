@@ -83,15 +83,6 @@ class DashboardHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          child: const Text(
-            'POS TERMINAL',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: Color(0xFF64748B),
-            ),
-          ),
         ),
         const Spacer(),
         IconButton(

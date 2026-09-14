@@ -5,6 +5,7 @@ import '../../models/pos_models.dart';
 class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
   final Shift shift;
   final DateTime currentTime;
+  final VoidCallback onOpenOrderHistory;
   final VoidCallback onViewReport;
   final VoidCallback onCloseShift;
 
@@ -14,6 +15,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.shift,
     required this.currentTime,
+    required this.onOpenOrderHistory,
     required this.onViewReport,
     required this.onCloseShift,
   });
@@ -96,6 +98,13 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
           ),
         ),
         const SizedBox(width: 4),
+
+        // Tombol Riwayat Transaksi Shift Ini
+        IconButton(
+          icon: const Icon(Icons.receipt_long_outlined, size: 20, color: Color(0xFF0F172A)),
+          tooltip: 'Riwayat Transaksi',
+          onPressed: onOpenOrderHistory,
+        ),
 
         // Tombol Laporan
         IconButton(

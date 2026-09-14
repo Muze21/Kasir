@@ -79,17 +79,27 @@ class DatabaseService {
 
   // GET SHIFT STATS SEMENTARA
   Future<ShiftStats> getShiftStats(String shiftId) async {
-    final orders = await _supabase
-        .from('orders')
-        .select('total_amount')
-        .eq('shift_id', shiftId);
+    List<dynamic> ordersList;
+    try {
+      final orders = await _supabase
+          .from('orders')
+          .select('total_amount, status')
+          .eq('shift_id', shiftId);
+      ordersList = orders as List;
+    } catch (_) {
+      final orders = await _supabase
+          .from('orders')
+          .select('total_amount')
+          .eq('shift_id', shiftId);
+      ordersList = orders as List;
+    }
     final expenses = await _supabase
         .from('expenses')
         .select('amount')
         .eq('shift_id', shiftId);
     return ShiftStats.fromData(
-      orderCount: (orders as List).length,
-      orders: orders as List,
+      orderCount: ordersList.length,
+      orders: ordersList,
       expenses: expenses as List,
     );
   }
@@ -176,9 +186,26 @@ class DatabaseService {
         .from('orders')
         .select('*, profiles(id, full_name), order_items(*)')
         .eq('shift_id', shiftId)
-        .order('created_at', ascending: false);
+        .order('queue_number', ascending: false);
 
     return (response as List).map((json) => Order.fromJson(json)).toList();
+  }
+
+  // BATALKAN / VOID ORDER
+  Future<bool> voidOrder(String orderId, {String? reason}) async {
+    try {
+      // Coba soft-delete jika kolom status sudah ada di Supabase
+      await _supabase.from('orders').update({
+        'status': 'voided',
+        'void_reason': (reason != null && reason.trim().isNotEmpty) ? reason.trim() : 'Dibatalkan kasir',
+      }).eq('id', orderId);
+      return true;
+    } catch (_) {
+      // Fallback jika database belum ada kolom status:
+      // Lakukan hard-delete agar pesanan terhapus dan omzet shift tetap akurat
+      await _supabase.from('orders').delete().eq('id', orderId);
+      return false;
+    }
   }
 
   // AMBIL SEMUA PENGELUARAN DI SATU SHIFT
@@ -208,7 +235,11 @@ class DatabaseService {
     double totalOmzet = 0;
     double totalCash = 0;
     double totalQris = 0;
+    int activeOrdersCount = 0;
+
     for (final o in orders) {
+      if (o.isVoided) continue;
+      activeOrdersCount++;
       totalOmzet += o.totalAmount;
       if (o.paymentMethod == 'qris') {
         totalQris += o.totalAmount;
@@ -226,6 +257,7 @@ class DatabaseService {
     final Map<String, _UserStatsAcc> userMap = {};
 
     for (final o in orders) {
+      if (o.isVoided) continue;
       final uid = o.userId;
       final name = o.profile?.fullName ?? 'User ($uid)';
       userMap.putIfAbsent(uid, () => _UserStatsAcc(userId: uid, userName: name));
@@ -250,7 +282,7 @@ class DatabaseService {
 
     return ShiftReportData(
       shift: shift,
-      totalOrders: orders.length,
+      totalOrders: activeOrdersCount,
       totalOmzet: totalOmzet,
       totalCash: totalCash,
       totalQris: totalQris,
@@ -296,8 +328,11 @@ class DatabaseService {
     double totalQris = 0;
     int cashCount = 0;
     int qrisCount = 0;
+    int activeOrdersCount = 0;
 
     for (final o in orders) {
+      if (o.isVoided) continue;
+      activeOrdersCount++;
       totalOmzet += o.totalAmount;
       if (o.paymentMethod == 'qris') {
         totalQris += o.totalAmount;
@@ -316,6 +351,7 @@ class DatabaseService {
     // 4. Hitung Top Selling Items (Menu Terlaris)
     final Map<String, _ItemAgg> itemMap = {};
     for (final o in orders) {
+      if (o.isVoided) continue;
       for (final item in o.items) {
         final name = item.itemName;
         itemMap.putIfAbsent(name, () => _ItemAgg(itemName: name));
@@ -343,6 +379,7 @@ class DatabaseService {
     }
 
     for (final o in orders) {
+      if (o.isVoided) continue;
       final localDate = o.createdAt.toLocal();
       final key = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
       if (dailyMap.containsKey(key)) {
@@ -376,7 +413,7 @@ class DatabaseService {
       totalOmzet: totalOmzet,
       totalExpenses: totalExpenses,
       bersih: totalOmzet - totalExpenses,
-      totalOrders: orders.length,
+      totalOrders: activeOrdersCount,
       totalCash: totalCash,
       totalQris: totalQris,
       cashOrderCount: cashCount,

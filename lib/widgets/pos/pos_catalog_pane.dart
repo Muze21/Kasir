@@ -10,6 +10,7 @@ class PosCatalogPane extends StatefulWidget {
   final void Function(String name, double price, int qty) onAddToCart;
   final List<Map<String, dynamic>> presetItems;
   final VoidCallback? onManageMenu;
+  final Map<String, int> cartItemCounts;
 
   const PosCatalogPane({
     super.key,
@@ -21,6 +22,7 @@ class PosCatalogPane extends StatefulWidget {
     required this.onAddToCart,
     required this.presetItems,
     this.onManageMenu,
+    this.cartItemCounts = const {},
   });
 
   @override
@@ -29,6 +31,7 @@ class PosCatalogPane extends StatefulWidget {
 
 class _PosCatalogPaneState extends State<PosCatalogPane> {
   String _selectedCategory = 'Semua';
+  bool _isCustomItemExpanded = false;
   static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
   List<String> get _categories {
@@ -247,6 +250,7 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                   final item = _filteredPresets[index];
                   final name = item['name'] as String;
                   final price = (item['price'] as num).toDouble();
+                  final inCartQty = widget.cartItemCounts[name] ?? 0;
 
                   return InkWell(
                     onTap: () => widget.onAddToCart(name, price, 1),
@@ -254,37 +258,67 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: inCartQty > 0 ? const Color(0xFFF0FDF4) : Colors.white,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(
+                          color: inCartQty > 0 ? const Color(0xFF10B981) : const Color(0xFFE2E8F0),
+                          width: inCartQty > 0 ? 1.5 : 1.0,
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Stack(
                         children: [
-                          Text(
-                            name,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: -0.2,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.only(right: inCartQty > 0 ? 26 : 0),
+                                child: Text(
+                                  name,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: inCartQty > 0 ? const Color(0xFF065F46) : const Color(0xFF0F172A),
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                              ),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  _rupiah.format(price),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _rupiah.format(price),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF059669),
+                          if (inCartQty > 0)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF059669),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  'x$inCartQty',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -292,121 +326,145 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                 },
               ),
 
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
 
-            // Card Input Barang Kustom / Manual
+            // Card Input Barang Kustom / Manual (Lipat/Accordion)
             Container(
-              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFF64748B)),
-                      SizedBox(width: 8),
-                      Text(
-                        'Input Barang Kustom / Tambahan',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: widget.customNameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Nama Barang',
-                            hintText: 'Contoh: Nasi Uduk Komplit',
+                  InkWell(
+                    onTap: () => setState(() => _isCustomItemExpanded = !_isCustomItemExpanded),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _isCustomItemExpanded ? Icons.edit_note_rounded : Icons.add_circle_outline_rounded,
+                            size: 18,
+                            color: const Color(0xFF64748B),
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: widget.customPriceCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: 'Harga (Rp)',
-                            hintText: '15000',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Stepper & Tombol Tambah: Adaptif jika layar sangat sempit
-                  Row(
-                    children: [
-                      // Stepper Qty
-                      Container(
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove, size: 15),
-                              padding: const EdgeInsets.all(6),
-                              constraints: const BoxConstraints(),
-                              onPressed: widget.customQty > 1
-                                  ? () => widget.onCustomQtyChanged(widget.customQty - 1)
-                                  : null,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(
-                                '${widget.customQty}',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Input Barang Manual / Kustom',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0F172A),
                               ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.add, size: 15),
-                              padding: const EdgeInsets.all(6),
-                              constraints: const BoxConstraints(),
-                              onPressed: () => widget.onCustomQtyChanged(widget.customQty + 1),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SizedBox(
-                          height: 42,
-                          child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                              padding: const EdgeInsets.symmetric(horizontal: 10),
-                            ),
-                            onPressed: _handleAddCustomItem,
-                            icon: const Icon(Icons.add_shopping_cart, size: 15),
-                            label: const FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text('Tambah ke Keranjang', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
-                            ),
                           ),
-                        ),
+                          Icon(
+                            _isCustomItemExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                            size: 20,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
+                  if (_isCustomItemExpanded) ...[
+                    const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                    Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: widget.customNameCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Nama Barang',
+                                    hintText: 'Contoh: Nasi Uduk Komplit',
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: TextField(
+                                  controller: widget.customPriceCtrl,
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Harga (Rp)',
+                                    hintText: '15000',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              // Stepper Qty
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove, size: 15),
+                                      padding: const EdgeInsets.all(6),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: widget.customQty > 1
+                                          ? () => widget.onCustomQtyChanged(widget.customQty - 1)
+                                          : null,
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                                      child: Text(
+                                        '${widget.customQty}',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add, size: 15),
+                                      padding: const EdgeInsets.all(6),
+                                      constraints: const BoxConstraints(),
+                                      onPressed: () => widget.onCustomQtyChanged(widget.customQty + 1),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: SizedBox(
+                                  height: 42,
+                                  child: ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0F172A),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    ),
+                                    onPressed: _handleAddCustomItem,
+                                    icon: const Icon(Icons.add_shopping_cart, size: 15),
+                                    label: const FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text('Tambah ke Keranjang', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

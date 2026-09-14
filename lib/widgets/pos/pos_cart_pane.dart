@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-class PosCartPane extends StatelessWidget {
+class PosCartPane extends StatefulWidget {
   final List<Map<String, dynamic>> cart;
   final VoidCallback onClearCart;
   final void Function(int index, int delta) onUpdateQty;
@@ -11,12 +11,10 @@ class PosCartPane extends StatelessWidget {
   final TextEditingController cashInputCtrl;
   final double cartTotal;
   final int cartItemCount;
-  final double cashReceived;
-  final double cashChange;
+  final double? cashReceived;
+  final double? cashChange;
   final bool isSubmitting;
   final VoidCallback onSubmitOrder;
-
-  static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
   const PosCartPane({
     super.key,
@@ -29,18 +27,59 @@ class PosCartPane extends StatelessWidget {
     required this.cashInputCtrl,
     required this.cartTotal,
     required this.cartItemCount,
-    required this.cashReceived,
-    required this.cashChange,
+    this.cashReceived,
+    this.cashChange,
     required this.isSubmitting,
     required this.onSubmitOrder,
   });
 
-  bool get _canSubmit {
-    if (cart.isEmpty || isSubmitting) return false;
-    if (paymentMethod == 'cash') {
-      return cashReceived >= cartTotal && cartTotal > 0;
+  @override
+  State<PosCartPane> createState() => _PosCartPaneState();
+}
+
+class _PosCartPaneState extends State<PosCartPane> {
+  static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.cashInputCtrl.addListener(_onCashChanged);
+  }
+
+  @override
+  void didUpdateWidget(PosCartPane oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cashInputCtrl != widget.cashInputCtrl) {
+      oldWidget.cashInputCtrl.removeListener(_onCashChanged);
+      widget.cashInputCtrl.addListener(_onCashChanged);
     }
-    return cartTotal > 0;
+  }
+
+  @override
+  void dispose() {
+    widget.cashInputCtrl.removeListener(_onCashChanged);
+    super.dispose();
+  }
+
+  void _onCashChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  double get _cashReceived {
+    final clean = widget.cashInputCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    return double.tryParse(clean) ?? 0.0;
+  }
+
+  double get _cashChange => _cashReceived - widget.cartTotal;
+
+  bool get _canSubmit {
+    if (widget.cart.isEmpty || widget.isSubmitting) return false;
+    if (widget.paymentMethod == 'cash') {
+      return _cashReceived >= widget.cartTotal && widget.cartTotal > 0;
+    }
+    return widget.cartTotal > 0;
   }
 
   @override
@@ -68,7 +107,7 @@ class PosCartPane extends StatelessWidget {
               const Icon(Icons.shopping_bag_outlined, size: 20, color: Color(0xFF0F172A)),
               const SizedBox(width: 8),
               Text(
-                'Keranjang ($cartItemCount item)',
+                'Keranjang (${widget.cartItemCount} item)',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -76,9 +115,9 @@ class PosCartPane extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (cart.isNotEmpty)
+              if (widget.cart.isNotEmpty)
                 TextButton(
-                  onPressed: onClearCart,
+                  onPressed: widget.onClearCart,
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
@@ -94,7 +133,7 @@ class PosCartPane extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Daftar Item Keranjang
-          if (cart.isEmpty)
+          if (widget.cart.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 28),
               child: Column(
@@ -126,10 +165,10 @@ class PosCartPane extends StatelessWidget {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: cart.length,
+              itemCount: widget.cart.length,
               separatorBuilder: (context, index) => const Divider(height: 12, color: Color(0xFFF1F5F9)),
               itemBuilder: (context, index) {
-                final item = cart[index];
+                final item = widget.cart[index];
                 final name = item['name'] as String;
                 final price = (item['price'] as num).toDouble();
                 final qty = item['qty'] as int;
@@ -169,7 +208,7 @@ class PosCartPane extends StatelessWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           InkWell(
-                            onTap: () => onUpdateQty(index, -1),
+                            onTap: () => widget.onUpdateQty(index, -1),
                             child: const Padding(padding: EdgeInsets.all(3), child: Icon(Icons.remove, size: 13)),
                           ),
                           Padding(
@@ -177,7 +216,7 @@ class PosCartPane extends StatelessWidget {
                             child: Text('$qty', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                           ),
                           InkWell(
-                            onTap: () => onUpdateQty(index, 1),
+                            onTap: () => widget.onUpdateQty(index, 1),
                             child: const Padding(padding: EdgeInsets.all(3), child: Icon(Icons.add, size: 13)),
                           ),
                         ],
@@ -197,7 +236,7 @@ class PosCartPane extends StatelessWidget {
 
                     // Tombol Hapus (Kompak agar tidak overflow)
                     InkWell(
-                      onTap: () => onRemoveItem(index),
+                      onTap: () => widget.onRemoveItem(index),
                       borderRadius: BorderRadius.circular(4),
                       child: const Padding(
                         padding: EdgeInsets.all(4),
@@ -229,7 +268,7 @@ class PosCartPane extends StatelessWidget {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  _rupiah.format(cartTotal),
+                  _rupiah.format(widget.cartTotal),
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -253,29 +292,29 @@ class PosCartPane extends StatelessWidget {
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: () => onPaymentMethodChanged('cash'),
+                  onTap: () => widget.onPaymentMethodChanged('cash'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: paymentMethod == 'cash' ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
+                      color: widget.paymentMethod == 'cash' ? const Color(0xFFECFDF5) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: paymentMethod == 'cash' ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
-                        width: paymentMethod == 'cash' ? 1.5 : 1,
+                        color: widget.paymentMethod == 'cash' ? const Color(0xFF059669) : const Color(0xFFE2E8F0),
+                        width: widget.paymentMethod == 'cash' ? 1.5 : 1,
                       ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.payments_outlined, size: 16, color: paymentMethod == 'cash' ? const Color(0xFF059669) : const Color(0xFF64748B)),
+                        Icon(Icons.payments_outlined, size: 16, color: widget.paymentMethod == 'cash' ? const Color(0xFF059669) : const Color(0xFF64748B)),
                         const SizedBox(width: 6),
                         Text(
                           'TUNAI',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: paymentMethod == 'cash' ? const Color(0xFF059669) : const Color(0xFF64748B),
+                            color: widget.paymentMethod == 'cash' ? const Color(0xFF059669) : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -286,29 +325,29 @@ class PosCartPane extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: InkWell(
-                  onTap: () => onPaymentMethodChanged('qris'),
+                  onTap: () => widget.onPaymentMethodChanged('qris'),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
-                      color: paymentMethod == 'qris' ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
+                      color: widget.paymentMethod == 'qris' ? const Color(0xFFEEF2FF) : const Color(0xFFF8FAFC),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: paymentMethod == 'qris' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
-                        width: paymentMethod == 'qris' ? 1.5 : 1,
+                        color: widget.paymentMethod == 'qris' ? const Color(0xFF4F46E5) : const Color(0xFFE2E8F0),
+                        width: widget.paymentMethod == 'qris' ? 1.5 : 1,
                       ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.qr_code_2_rounded, size: 16, color: paymentMethod == 'qris' ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
+                        Icon(Icons.qr_code_2_rounded, size: 16, color: widget.paymentMethod == 'qris' ? const Color(0xFF4F46E5) : const Color(0xFF64748B)),
                         const SizedBox(width: 6),
                         Text(
                           'QRIS',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: paymentMethod == 'qris' ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+                            color: widget.paymentMethod == 'qris' ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
                           ),
                         ),
                       ],
@@ -320,10 +359,10 @@ class PosCartPane extends StatelessWidget {
           ),
 
           // Area Kalkulator Tunai (Jika Cash dipilih)
-          if (paymentMethod == 'cash') ...[
+          if (widget.paymentMethod == 'cash') ...[
             const SizedBox(height: 14),
             TextField(
-              controller: cashInputCtrl,
+              controller: widget.cashInputCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: 'Uang Diterima dari Pelanggan',
@@ -337,9 +376,9 @@ class PosCartPane extends StatelessWidget {
               spacing: 6,
               runSpacing: 6,
               children: [
-                if (cartTotal > 0) ...[
-                  _buildQuickCashChip('Uang Pas', cartTotal),
-                  ..._getSmartCashSuggestions(cartTotal).map(
+                if (widget.cartTotal > 0) ...[
+                  _buildQuickCashChip('Uang Pas', widget.cartTotal),
+                  ..._getSmartCashSuggestions(widget.cartTotal).map(
                     (val) => _buildQuickCashChip(_formatNominalLabel(val), val),
                   ),
                 ] else ...[
@@ -352,46 +391,65 @@ class PosCartPane extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             // Kotak Kembalian
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: cashInputCtrl.text.isEmpty
+            Builder(
+              builder: (context) {
+                final isCashEmpty = widget.cashInputCtrl.text.trim().isEmpty;
+                final isOverOrExact = _cashChange >= 0;
+
+                final Color bgColor = isCashEmpty
                     ? const Color(0xFFF8FAFC)
-                    : (cashChange >= 0 ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2)),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: cashInputCtrl.text.isEmpty
-                      ? const Color(0xFFE2E8F0)
-                      : (cashChange >= 0 ? const Color(0xFF10B981).withAlpha(80) : const Color(0xFFEF4444).withAlpha(80)),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    cashChange >= 0 ? 'KEMBALIAN:' : 'UANG KURANG:',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                      color: cashChange >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
-                    ),
+                    : (isOverOrExact ? const Color(0xFFECFDF5) : const Color(0xFFFEF2F2));
+
+                final Color borderColor = isCashEmpty
+                    ? const Color(0xFFE2E8F0)
+                    : (isOverOrExact ? const Color(0xFF10B981).withAlpha(80) : const Color(0xFFEF4444).withAlpha(80));
+
+                final Color textColor = isCashEmpty
+                    ? const Color(0xFF64748B)
+                    : (isOverOrExact ? const Color(0xFF059669) : const Color(0xFFDC2626));
+
+                final String label = isCashEmpty
+                    ? 'KEMBALIAN:'
+                    : (isOverOrExact ? 'KEMBALIAN:' : 'UANG KURANG:');
+
+                final String amountText = isCashEmpty
+                    ? 'Rp0'
+                    : _rupiah.format(_cashChange.abs());
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: borderColor),
                   ),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      cashInputCtrl.text.isEmpty
-                          ? 'Rp0'
-                          : _rupiah.format(cashChange.abs()),
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        color: cashChange >= 0 ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                          color: textColor,
+                        ),
                       ),
-                    ),
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          amountText,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            color: textColor,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ] else ...[
             const SizedBox(height: 14),
@@ -429,8 +487,8 @@ class PosCartPane extends StatelessWidget {
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: _canSubmit ? onSubmitOrder : null,
-              icon: isSubmitting
+              onPressed: _canSubmit ? widget.onSubmitOrder : null,
+              icon: widget.isSubmitting
                   ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -438,11 +496,11 @@ class PosCartPane extends StatelessWidget {
                     )
                   : const Icon(Icons.check_circle_outline, size: 18),
               label: Text(
-                isSubmitting
+                widget.isSubmitting
                     ? 'Memproses Transaksi...'
-                    : (paymentMethod == 'cash'
-                        ? 'Selesaikan Tunai (${_rupiah.format(cartTotal)})'
-                        : 'Selesaikan QRIS (${_rupiah.format(cartTotal)})'),
+                    : (widget.paymentMethod == 'cash'
+                        ? 'Selesaikan Tunai (${_rupiah.format(widget.cartTotal)})'
+                        : 'Selesaikan QRIS (${_rupiah.format(widget.cartTotal)})'),
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ),
@@ -460,7 +518,10 @@ class PosCartPane extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       visualDensity: VisualDensity.compact,
       onPressed: () {
-        cashInputCtrl.text = value.toStringAsFixed(0);
+        widget.cashInputCtrl.text = value.toStringAsFixed(0);
+        widget.cashInputCtrl.selection = TextSelection.fromPosition(
+          TextPosition(offset: widget.cashInputCtrl.text.length),
+        );
       },
     );
   }

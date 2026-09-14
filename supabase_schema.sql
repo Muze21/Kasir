@@ -34,6 +34,8 @@ create table if not exists public.orders (
   total_amount numeric default 0 check (total_amount >= 0),
   payment_method text check (payment_method in ('cash', 'qris')),
   user_id uuid not null default auth.uid() references public.profiles(id),
+  status text check (status in ('completed', 'voided')) default 'completed',
+  void_reason text,
   created_at timestamptz default now()
 );
 
@@ -133,3 +135,7 @@ values
   ('kerupuk gede', 5000, 'Makanan'),
   ('kerupuk kecil', 2000, 'Makanan')
 on conflict do nothing;
+
+-- 11. MIGRATION HELPER (Jalankan jika database lama belum ada kolom status & void_reason):
+-- alter table public.orders add column if not exists status text check (status in ('completed', 'voided')) default 'completed';
+-- alter table public.orders add column if not exists void_reason text;

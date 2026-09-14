@@ -54,7 +54,7 @@ class _ReportScreenState extends State<ReportScreen> {
       // 1. Semua order di shift itu + profil siapa yang input
       final ordersRes = await _supabase
           .from('orders')
-          .select('id, queue_number, customer_name, total_amount, payment_method, user_id, created_at, profiles(id, full_name), order_items(item_name, qty, price, subtotal)')
+          .select('*, profiles(id, full_name), order_items(item_name, qty, price, subtotal)')
           .eq('shift_id', widget.shiftId)
           .order('queue_number', ascending: true);
 
@@ -73,6 +73,9 @@ class _ReportScreenState extends State<ReportScreen> {
       double cQris = 0;
 
       for (final o in orders) {
+        final status = (o['status'] as String?) ?? 'completed';
+        if (status == 'voided') continue;
+
         final amt = (o['total_amount'] as num).toDouble();
         omzet += amt;
         final p = (o['payment_method'] as String?) ?? 'cash';
@@ -93,11 +96,14 @@ class _ReportScreenState extends State<ReportScreen> {
       // 3. STRUKTUR TRANSAKSI / PENGELUARAN UNTUK UI
       final transaksi = orders.map((o) {
         final prof = o['profiles'];
+        final status = (o['status'] as String?) ?? 'completed';
         return {
           'queue': o['queue_number'] ?? 0,
           'name': o['customer_name'] ?? 'Pelanggan ${o['queue_number']}',
           'total': (o['total_amount'] as num).toDouble(),
           'pay': (o['payment_method'] as String?) ?? 'cash',
+          'status': status,
+          'voidReason': o['void_reason'] as String?,
           'inputBy': prof != null ? (prof['full_name'] as String) : 'anggota',
           'items': (o['order_items'] as List<dynamic>?) ?? [],
           'created': o['created_at'] != null ? DateTime.parse(o['created_at'] as String).toLocal() : null,
@@ -118,6 +124,9 @@ class _ReportScreenState extends State<ReportScreen> {
       Map<String, _Acc> acc = {};
 
       for (final o in orders) {
+        final status = (o['status'] as String?) ?? 'completed';
+        if (status == 'voided') continue;
+
         final uid = o['user_id'] as String;
         final prof = o['profiles'];
         final nama = prof != null ? (prof['full_name'] as String) : 'User ($uid)';
@@ -332,7 +341,25 @@ class _ReportScreenState extends State<ReportScreen> {
                                           ],
                                         ),
                                       ),
-                                      Text(_rupiah.format(t['total']), style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF111111))),
+                                      if (t['status'] == 'voided') ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF2F2),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text('BATAL', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFDC2626))),
+                                        ),
+                                        const SizedBox(width: 6),
+                                      ],
+                                      Text(
+                                        _rupiah.format(t['total']),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: t['status'] == 'voided' ? const Color(0xFF94A3B8) : const Color(0xFF111111),
+                                          decoration: t['status'] == 'voided' ? TextDecoration.lineThrough : null,
+                                        ),
+                                      ),
                                       const SizedBox(width: 4),
                                       IconButton(
                                         icon: const Icon(Icons.share_outlined, size: 18, color: Color(0xFF64748B)),

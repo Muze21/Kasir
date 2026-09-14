@@ -46,14 +46,18 @@ class ShiftStats {
 
   factory ShiftStats.fromData({required int orderCount, required List<dynamic> orders, required List<dynamic> expenses}) {
     var omzet = 0.0;
+    var activeOrdersCount = 0;
     for (final o in orders) {
+      final status = (o['status'] as String?) ?? 'completed';
+      if (status == 'voided') continue;
       omzet += (o['total_amount'] as num).toDouble();
+      activeOrdersCount++;
     }
     var exp = 0.0;
     for (final e in expenses) {
       exp += (e['amount'] as num).toDouble();
     }
-    return ShiftStats(orderCount: orderCount, omzet: omzet, expenses: exp);
+    return ShiftStats(orderCount: activeOrdersCount, omzet: omzet, expenses: exp);
   }
 }
 
@@ -107,9 +111,13 @@ class Order {
   final double totalAmount;
   final String paymentMethod; // 'cash' or 'qris'
   final String userId;
+  final String status; // 'completed' or 'voided'
+  final String? voidReason;
   final Profile? profile;
   final List<OrderItem> items;
   final DateTime createdAt;
+
+  bool get isVoided => status == 'voided';
 
   Order({
     required this.id,
@@ -118,6 +126,8 @@ class Order {
     required this.totalAmount,
     required this.paymentMethod,
     required this.userId,
+    this.status = 'completed',
+    this.voidReason,
     this.profile,
     this.items = const [],
     required this.createdAt,
@@ -138,6 +148,8 @@ class Order {
       totalAmount: (json['total_amount'] as num).toDouble(),
       paymentMethod: (json['payment_method'] as String?) ?? 'cash',
       userId: json['user_id'] as String,
+      status: (json['status'] as String?) ?? 'completed',
+      voidReason: json['void_reason'] as String?,
       profile: json['profiles'] != null ? Profile.fromJson(json['profiles']) : null,
       items: itemsList,
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
