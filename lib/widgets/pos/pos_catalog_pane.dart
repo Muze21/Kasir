@@ -9,6 +9,7 @@ class PosCatalogPane extends StatefulWidget {
   final ValueChanged<int> onCustomQtyChanged;
   final void Function(String name, double price, int qty) onAddToCart;
   final List<Map<String, dynamic>> presetItems;
+  final VoidCallback? onManageMenu;
 
   const PosCatalogPane({
     super.key,
@@ -19,6 +20,7 @@ class PosCatalogPane extends StatefulWidget {
     required this.onCustomQtyChanged,
     required this.onAddToCart,
     required this.presetItems,
+    this.onManageMenu,
   });
 
   @override
@@ -124,6 +126,32 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                     letterSpacing: -0.2,
                   ),
                 ),
+                if (widget.onManageMenu != null) ...[
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: widget.onManageMenu,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFCBD5E1)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.tune_rounded, size: 12, color: Color(0xFF334155)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Kelola Menu',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   '${_filteredPresets.length} item',
@@ -172,16 +200,35 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
             // Grid Preset Menu
             if (_filteredPresets.isEmpty)
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
-                child: const Center(
-                  child: Text(
-                    'Belum ada menu di kategori ini.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.inventory_2_outlined, size: 32, color: Color(0xFF94A3B8)),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Belum ada menu di kategori ini.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      if (widget.onManageMenu != null) ...[
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          onPressed: widget.onManageMenu,
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFF059669),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(Icons.add, size: 16),
+                          label: const Text('Tambah Menu Sekarang', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
               )

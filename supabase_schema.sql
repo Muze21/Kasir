@@ -112,17 +112,24 @@ alter table public.profiles enable row level security;
 alter table public.shifts enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
-alter table public.expenses enable row level security;
+-- 10. PRODUCTS / MENU TOKO
+create table if not exists public.products (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  price numeric not null check (price >= 0),
+  category text not null default 'Makanan',
+  is_available boolean default true,
+  created_at timestamptz default now()
+);
 
-create policy "Auth access shifts" on public.shifts
+alter table public.products enable row level security;
+create policy "Auth access products" on public.products
   for all to authenticated using (true) with check (true);
-create policy "Auth access orders" on public.orders
-  for all to authenticated using (true) with check (true);
-create policy "Auth access order_items" on public.order_items
-  for all to authenticated using (true) with check (true);
-create policy "Auth access expenses" on public.expenses
-  for all to authenticated using (true) with check (true);
-create policy "Auth read profiles" on public.profiles
-  for select to authenticated using (true);
-create policy "Auth own profile" on public.profiles
-  for update to authenticated using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Insert default sample products
+insert into public.products (name, price, category)
+values
+  ('soto nasi', 12000, 'Makanan'),
+  ('kerupuk gede', 5000, 'Makanan'),
+  ('kerupuk kecil', 2000, 'Makanan')
+on conflict do nothing;

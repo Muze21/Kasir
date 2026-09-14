@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
+import '../services/receipt_service.dart';
 
 class ReportScreen extends StatefulWidget {
   final String shiftId;
@@ -332,6 +333,24 @@ class _ReportScreenState extends State<ReportScreen> {
                                         ),
                                       ),
                                       Text(_rupiah.format(t['total']), style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF111111))),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        icon: const Icon(Icons.share_outlined, size: 18, color: Color(0xFF64748B)),
+                                        tooltip: 'Kirim / Salin Struk',
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: () {
+                                          ReceiptService.showShareReceiptModal(
+                                            context: context,
+                                            queueNumber: (t['queue'] as num).toInt(),
+                                            total: (t['total'] as num).toDouble(),
+                                            paymentMethod: t['pay'] as String,
+                                            customerName: t['name'] as String,
+                                            cashierName: t['inputBy'] as String?,
+                                            timestamp: t['created'] as DateTime?,
+                                            items: (t['items'] as List<dynamic>?) ?? [],
+                                          );
+                                        },
+                                      ),
                                     ],
                                   ),
                                   if ((t['items'] as List).isNotEmpty) ...[

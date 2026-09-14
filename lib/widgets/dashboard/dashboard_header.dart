@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../screens/manage_menu_screen.dart';
 import '../../screens/periodic_report_screen.dart';
 
 class DashboardHeader extends StatelessWidget {
@@ -93,6 +94,16 @@ class DashboardHeader extends StatelessWidget {
           ),
         ),
         const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.restaurant_menu_rounded, size: 20, color: Color(0xFF0F172A)),
+          tooltip: 'Kelola Menu Toko',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ManageMenuScreen()),
+            );
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.bar_chart_rounded, size: 21, color: Color(0xFF0F172A)),
           tooltip: 'Laporan Toko',

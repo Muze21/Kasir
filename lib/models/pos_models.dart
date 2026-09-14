@@ -282,3 +282,47 @@ class PeriodicReportData {
   });
 }
 
+class Product {
+  final String id;
+  final String name;
+  final double price;
+  final String category;
+  final bool isAvailable;
+
+  Product({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.category,
+    this.isAvailable = true,
+  });
+
+  factory Product.fromJson(Map<String, dynamic> json) {
+    return Product(
+      id: (json['id'] ?? '').toString(),
+      name: (json['name'] ?? '').toString(),
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      category: (json['category'] ?? 'Makanan').toString(),
+      isAvailable: json['is_available'] as bool? ?? true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'name': name,
+      'price': price,
+      'category': category,
+      'is_available': isAvailable,
+    };
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'price': price,
+      'category': category,
+    };
+  }
+}
+

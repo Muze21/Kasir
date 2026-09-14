@@ -6,6 +6,7 @@ import '../widgets/pos/pos_cart_pane.dart';
 import '../widgets/pos/pos_catalog_pane.dart';
 import '../widgets/pos/pos_ticket_dialog.dart';
 import '../widgets/pos/pos_top_bar.dart';
+import 'manage_menu_screen.dart';
 import 'report_screen.dart';
 
 class PosScreen extends StatefulWidget {
@@ -35,8 +36,8 @@ class _PosScreenState extends State<PosScreen> {
   Timer? _clockTimer;
   DateTime _currentTime = DateTime.now();
 
-  // Preset Barang Toko (Disesuaikan dengan menu user)
-  static const List<Map<String, dynamic>> _presetItems = [
+  // Preset Barang Toko (Dinamis dari Database / Fallback)
+  List<Map<String, dynamic>> _presetItems = [
     {'name': 'soto nasi', 'price': 12000.0, 'category': 'makanan'},
     {'name': 'kerupuk gede', 'price': 5000.0, 'category': 'makanan'},
     {'name': 'kerupuk kecil', 'price': 2000.0, 'category': 'makanan'},
@@ -45,6 +46,7 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
+    _loadProducts();
     _cashInputCtrl.addListener(() {
       if (mounted) setState(() {});
     });
@@ -52,6 +54,29 @@ class _PosScreenState extends State<PosScreen> {
       if (mounted) {
         setState(() => _currentTime = DateTime.now());
       }
+    });
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final products = await _db.getProducts();
+      if (!mounted) return;
+      if (products.isNotEmpty) {
+        setState(() {
+          _presetItems = products.map((p) => p.toMap()).toList();
+        });
+      }
+    } catch (_) {
+      // Pertahankan menu fallback jika gagal/offline
+    }
+  }
+
+  void _openManageMenu() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ManageMenuScreen()),
+    ).then((_) {
+      _loadProducts();
     });
   }
 
@@ -181,6 +206,7 @@ class _PosScreenState extends State<PosScreen> {
         cashReceived: cashGiven,
         change: changeAmount,
         customerName: customerName,
+        items: orderItems,
       );
     } catch (e) {
       if (!mounted) return;
@@ -202,6 +228,7 @@ class _PosScreenState extends State<PosScreen> {
     required double cashReceived,
     required double change,
     required String customerName,
+    required List<Map<String, dynamic>> items,
   }) {
     showDialog(
       context: context,
@@ -213,6 +240,7 @@ class _PosScreenState extends State<PosScreen> {
         cashReceived: cashReceived,
         change: change,
         customerName: customerName,
+        items: items,
         onNextTransaction: () => Navigator.pop(ctx),
         onBackToDashboard: () {
           Navigator.pop(ctx);
@@ -294,6 +322,7 @@ class _PosScreenState extends State<PosScreen> {
                       onCustomQtyChanged: (q) => setState(() => _customQty = q),
                       onAddToCart: _addToCart,
                       presetItems: _presetItems,
+                      onManageMenu: _openManageMenu,
                     ),
                   ),
                 ),
@@ -338,6 +367,7 @@ class _PosScreenState extends State<PosScreen> {
                   onCustomQtyChanged: (q) => setState(() => _customQty = q),
                   onAddToCart: _addToCart,
                   presetItems: _presetItems,
+                  onManageMenu: _openManageMenu,
                 ),
                 const SizedBox(height: 16),
                 PosCartPane(

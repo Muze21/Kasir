@@ -387,6 +387,98 @@ class DatabaseService {
       orders: orders,
     );
   }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // MANAJEMEN PRODUK / MENU TOKO (CRUD)
+  // ───────────────────────────────────────────────────────────────────────────
+  static final List<Product> _fallbackProducts = [
+    Product(id: 'prod-1', name: 'soto nasi', price: 12000.0, category: 'Makanan'),
+    Product(id: 'prod-2', name: 'kerupuk gede', price: 5000.0, category: 'Makanan'),
+    Product(id: 'prod-3', name: 'kerupuk kecil', price: 2000.0, category: 'Makanan'),
+  ];
+
+  Future<List<Product>> getProducts() async {
+    try {
+      final res = await _supabase
+          .from('products')
+          .select()
+          .order('name', ascending: true);
+      final list = (res as List).map((j) => Product.fromJson(j)).toList();
+      if (list.isNotEmpty) {
+        _fallbackProducts.clear();
+        _fallbackProducts.addAll(list);
+        return list;
+      }
+    } catch (_) {
+      // Fallback ke cache in-memory jika tabel belum dibuat di Supabase
+    }
+    return List<Product>.from(_fallbackProducts);
+  }
+
+  Future<Product> addProduct({
+    required String name,
+    required double price,
+    required String category,
+  }) async {
+    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
+    final newProduct = Product(
+      id: tempId,
+      name: name,
+      price: price,
+      category: category,
+    );
+
+    try {
+      final res = await _supabase.from('products').insert({
+        'name': name,
+        'price': price,
+        'category': category,
+      }).select().single();
+      final created = Product.fromJson(res);
+      _fallbackProducts.removeWhere((p) => p.id == tempId);
+      _fallbackProducts.add(created);
+      return created;
+    } catch (_) {
+      _fallbackProducts.add(newProduct);
+      return newProduct;
+    }
+  }
+
+  Future<void> updateProduct({
+    required String id,
+    required String name,
+    required double price,
+    required String category,
+  }) async {
+    final index = _fallbackProducts.indexWhere((p) => p.id == id);
+    if (index >= 0) {
+      _fallbackProducts[index] = Product(
+        id: id,
+        name: name,
+        price: price,
+        category: category,
+      );
+    }
+
+    try {
+      await _supabase.from('products').update({
+        'name': name,
+        'price': price,
+        'category': category,
+      }).eq('id', id);
+    } catch (_) {
+      // Offline fallback updated
+    }
+  }
+
+  Future<void> deleteProduct(String id) async {
+    _fallbackProducts.removeWhere((p) => p.id == id);
+    try {
+      await _supabase.from('products').delete().eq('id', id);
+    } catch (_) {
+      // Offline fallback deleted
+    }
+  }
 }
 
 class _UserStatsAcc {
