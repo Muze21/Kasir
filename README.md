@@ -2,12 +2,6 @@
 
 Aplikasi kasir (POS) untuk toko / usaha keluarga berbasis Flutter dan Supabase. Dibuat dengan konsep shift bersama, jadi beberapa HP/perangkat bisa dipakai transaksi barengan dalam 1 sesi toko.
 
-# Download APK
-
-File APK siap pakai bisa diunduh di [Releases](https://github.com/Muze21/Kasir/releases).
-
-Catatan Install: Jika muncul peringatan _"Install unknown apps"_, aktifkan izin instalasi APK dari browser / file manager di pengaturan Android kamu.
-
 # Fitur Utama
 
 - Shift Bersama: Satu toko buka sesi, semua kasir bisa langsung transaksi di HP masing-masing.
