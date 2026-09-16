@@ -75,15 +75,6 @@ class DashboardHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-        ),
         const Spacer(),
         IconButton(
           icon: const Icon(Icons.restaurant_menu_rounded, size: 20, color: Color(0xFF0F172A)),

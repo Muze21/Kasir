@@ -327,4 +327,273 @@ class ReceiptService {
       ),
     );
   }
+
+  /// Format teks rekap laporan shift yang rapi untuk dikirim via WhatsApp / Clipboard
+  static String generateShiftSummaryText({
+    required String shiftStatus,
+    required DateTime openedAt,
+    DateTime? closedAt,
+    String? openerName,
+    String? closerName,
+    required double omzet,
+    required double cashTotal,
+    required double qrisTotal,
+    required int cashCount,
+    required int qrisCount,
+    required double expensesTotal,
+    required int expenseCount,
+    required double bersih,
+    required int completedOrdersCount,
+    required int voidedOrdersCount,
+    required double voidedTotal,
+    required List<Map<String, dynamic>> perKasir,
+  }) {
+    final openStr = DateFormat('dd/MM/yyyy HH:mm', 'id_ID').format(openedAt.toLocal());
+    final closeStr = closedAt != null ? DateFormat('dd/MM/yyyy HH:mm', 'id_ID').format(closedAt.toLocal()) : 'Masih Berjalan (Aktif)';
+    final duration = (closedAt ?? DateTime.now()).difference(openedAt);
+    final hours = duration.inHours;
+    final mins = duration.inMinutes.remainder(60);
+    final durationStr = '${hours > 0 ? '$hours jam ' : ''}$mins menit';
+
+    final buffer = StringBuffer();
+    buffer.writeln('================================');
+    buffer.writeln('     *REKAP SESI SHIFT KASKITA*');
+    buffer.writeln('================================');
+    buffer.writeln('Status Sesi   : ${shiftStatus.toUpperCase()}');
+    buffer.writeln('Waktu Buka    : $openStr WIB');
+    buffer.writeln('Waktu Tutup   : $closeStr${closedAt != null ? ' WIB' : ''}');
+    buffer.writeln('Durasi Sesi   : $durationStr');
+    if (openerName != null && openerName.isNotEmpty) {
+      buffer.writeln('Petugas Buka  : $openerName');
+    }
+    if (closerName != null && closerName.isNotEmpty && closerName != openerName) {
+      buffer.writeln('Petugas Tutup : $closerName');
+    }
+    buffer.writeln('--------------------------------');
+    buffer.writeln('*RINGKASAN KEUANGAN:*');
+    buffer.writeln('• Total Penjualan (Omzet) : ${_rupiah.format(omzet)}');
+    buffer.writeln('  └ Tunai (Cash di Laci) : ${_rupiah.format(cashTotal)} ($cashCount trx)');
+    buffer.writeln('  └ QRIS                 : ${_rupiah.format(qrisTotal)} ($qrisCount trx)');
+    buffer.writeln('• Kas Keluar (Biaya)     : -${_rupiah.format(expensesTotal)} ($expenseCount item)');
+    buffer.writeln('--------------------------------');
+    buffer.writeln('*KAS MASUK BERSIH*        : *${_rupiah.format(bersih)}*');
+    buffer.writeln('--------------------------------');
+    buffer.writeln('*STATISTIK OPERASIONAL:*');
+    buffer.writeln('• Pesanan Selesai         : $completedOrdersCount transaksi');
+    if (completedOrdersCount > 0) {
+      final aov = omzet / completedOrdersCount;
+      buffer.writeln('• Rata-rata per Pesanan   : ${_rupiah.format(aov)}');
+    }
+    if (voidedOrdersCount > 0) {
+      buffer.writeln('• Pesanan Dibatalkan/Void : $voidedOrdersCount transaksi (${_rupiah.format(voidedTotal)})');
+    }
+
+    if (perKasir.isNotEmpty) {
+      buffer.writeln('--------------------------------');
+      buffer.writeln('*KONTRIBUSI KASIR:*');
+      for (final k in perKasir) {
+        final name = k['name'] ?? 'Kasir';
+        final kOmzet = (k['omzet'] as num?)?.toDouble() ?? 0.0;
+        final kExp = (k['exp'] as num?)?.toDouble() ?? 0.0;
+        final kJum = k['jum'] ?? 0;
+        buffer.writeln('• $name: $kJum trx | Omzet ${_rupiah.format(kOmzet)}${kExp > 0 ? ' | Biaya -${_rupiah.format(kExp)}' : ''}');
+      }
+    }
+
+    buffer.writeln('================================');
+    buffer.writeln('  Laporan Otomatis KasKita POS');
+    buffer.writeln('================================');
+
+    return buffer.toString();
+  }
+
+  /// Modal dialog untuk membagikan rekap shift via WhatsApp / Clipboard
+  static void showShareShiftReportModal({
+    required BuildContext context,
+    required String shiftStatus,
+    required DateTime openedAt,
+    DateTime? closedAt,
+    String? openerName,
+    String? closerName,
+    required double omzet,
+    required double cashTotal,
+    required double qrisTotal,
+    required int cashCount,
+    required int qrisCount,
+    required double expensesTotal,
+    required int expenseCount,
+    required double bersih,
+    required int completedOrdersCount,
+    required int voidedOrdersCount,
+    required double voidedTotal,
+    required List<Map<String, dynamic>> perKasir,
+  }) {
+    final reportText = generateShiftSummaryText(
+      shiftStatus: shiftStatus,
+      openedAt: openedAt,
+      closedAt: closedAt,
+      openerName: openerName,
+      closerName: closerName,
+      omzet: omzet,
+      cashTotal: cashTotal,
+      qrisTotal: qrisTotal,
+      cashCount: cashCount,
+      qrisCount: qrisCount,
+      expensesTotal: expensesTotal,
+      expenseCount: expenseCount,
+      bersih: bersih,
+      completedOrdersCount: completedOrdersCount,
+      voidedOrdersCount: voidedOrdersCount,
+      voidedTotal: voidedTotal,
+      perKasir: perKasir,
+    );
+
+    final phoneCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Row(
+              children: [
+                Icon(Icons.assessment_rounded, color: Color(0xFF0F172A), size: 22),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Bagikan Rekap Shift',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Kirim ringkasan sesi shift ini ke WhatsApp Owner/Grup atau salin ke clipboard.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 180),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: SingleChildScrollView(
+                child: Text(
+                  reportText,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                    height: 1.4,
+                    color: Color(0xFF334155),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Nomor WhatsApp Tujuan (Opsional)',
+                hintText: 'Contoh: 08123456789 atau kosongkan untuk pilih kontak',
+                prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: Color(0xFF64748B)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF0F172A), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0F172A),
+                      side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      copyToClipboard(context, reportText);
+                    },
+                    icon: const Icon(Icons.copy_outlined, size: 16),
+                    label: const Text(
+                      'Salin Teks',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      final phone = phoneCtrl.text.trim();
+                      Navigator.pop(ctx);
+                      shareToWhatsApp(context, reportText, phoneNumber: phone);
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16),
+                    label: const Text(
+                      'Kirim ke WA',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

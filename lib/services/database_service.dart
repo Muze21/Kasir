@@ -77,6 +77,26 @@ class DatabaseService {
     return res != null ? Shift.fromJson(res) : null;
   }
 
+  // GET SHIFT BERDASARKAN ID
+  Future<Shift?> getShiftById(String shiftId) async {
+    try {
+      final res = await _supabase
+          .from('shifts')
+          .select('*, opener:profiles!opened_by(*), closer:profiles!closed_by(*)')
+          .eq('id', shiftId)
+          .maybeSingle();
+
+      return res != null ? Shift.fromJson(res) : null;
+    } catch (_) {
+      final res = await _supabase
+          .from('shifts')
+          .select()
+          .eq('id', shiftId)
+          .maybeSingle();
+      return res != null ? Shift.fromJson(res) : null;
+    }
+  }
+
   // GET SHIFT STATS SEMENTARA
   Future<ShiftStats> getShiftStats(String shiftId) async {
     List<dynamic> ordersList;

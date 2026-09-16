@@ -360,6 +360,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           qrisOrderCount: _qrisOrderCount,
                           onOpenPos: _openPosScreen,
                           onAddExpense: _showAddExpenseDialog,
+                          onViewReport: () => _viewReport(_activeShift!.id),
                           onCloseShift: _closeShift,
                         ),
                         const SizedBox(height: 14),

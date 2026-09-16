@@ -107,11 +107,26 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
         ),
 
         // Tombol Laporan
-        IconButton(
-          icon: const Icon(Icons.assessment_outlined, size: 20, color: Color(0xFF0F172A)),
-          tooltip: 'Laporan Sesi',
-          onPressed: onViewReport,
-        ),
+        if (!isMobile) ...[
+          OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF0F172A),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: onViewReport,
+            icon: const Icon(Icons.assessment_outlined, size: 16),
+            label: const Text('Rekap Sesi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          ),
+          const SizedBox(width: 4),
+        ] else ...[
+          IconButton(
+            icon: const Icon(Icons.assessment_outlined, size: 20, color: Color(0xFF0F172A)),
+            tooltip: 'Laporan Sesi',
+            onPressed: onViewReport,
+          ),
+        ],
 
         // Tombol Tutup Toko
         IconButton(
