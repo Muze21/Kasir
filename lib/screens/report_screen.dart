@@ -76,7 +76,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
       final expensesRes = await _supabase
           .from('expenses')
-          .select('id, note, amount, user_id, created_at, profiles(id, full_name)')
+          .select('id, note, amount, category, user_id, created_at, profiles(id, full_name)')
           .eq('shift_id', widget.shiftId)
           .order('created_at', ascending: true);
 
@@ -139,12 +139,13 @@ class _ReportScreenState extends State<ReportScreen> {
         };
       }).toList();
 
-      final pengeluaranList = expenses.map((e) {
+final pengeluaranList = expenses.map((e) {
         final prof = e['profiles'];
         return {
           'note': e['note'] as String,
           'amount': (e['amount'] as num).toDouble(),
-          'inputBy': prof != null ? (prof['full_name'] as String) : 'Kasir',
+          'category': (e['category'] as String?) ?? 'Operasional',
+          'inputBy': prof != null ? (prof['full_name'] as String) : 'anggota',
           'created': e['created_at'] != null ? DateTime.parse(e['created_at'] as String).toLocal() : null,
         };
       }).toList();
@@ -334,6 +335,13 @@ class _ReportScreenState extends State<ReportScreen> {
 
                         // 3. Bento Grid 4 Metrik
                         _buildBentoMetricsGrid(isMobile),
+
+                        if (_pengeluaranList.isNotEmpty) ...[
+                          const SizedBox(height: 18),
+
+                          // 3b. Breakdown Pengeluaran per Kategori
+                          _buildExpenseCategoryBreakdown(),
+                        ],
 
                         const SizedBox(height: 18),
 
@@ -567,6 +575,99 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildExpenseCategoryBreakdown() {
+    final Map<String, double> byCat = {for (final c in ExpenseCategories.all) c: 0.0};
+    double grand = 0.0;
+    for (final p in _pengeluaranList) {
+      final cat = (p['category'] as String?) ?? 'Operasional';
+      final amt = (p['amount'] as num).toDouble();
+      byCat.update(cat, (v) => v + amt, ifAbsent: () => amt);
+      grand += amt;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFFDC2626)),
+              SizedBox(width: 8),
+              Text(
+                'Pengeluaran per Kategori',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 12),
+          for (final cat in ExpenseCategories.all)
+            if ((byCat[cat] ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: ExpenseCategories.background(cat),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              ExpenseCategories.icons[cat] ?? Icons.receipt_long_outlined,
+                              size: 14,
+                              color: ExpenseCategories.textColor(cat),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            cat,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 2,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: grand > 0 ? (byCat[cat]! / grand).clamp(0.04, 1.0) : 0.0,
+                          minHeight: 6,
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          valueColor: AlwaysStoppedAnimation<Color>(ExpenseCategories.textColor(cat)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    SizedBox(
+                      width: 110,
+                      child: Text(
+                        _rupiah.format(byCat[cat]),
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
         ],
       ),
     );
@@ -1100,6 +1201,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildExpenseCard(Map<String, dynamic> p) {
+    final cat = (p['category'] as String?) ?? 'Operasional';
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -1115,23 +1217,51 @@ class _ReportScreenState extends State<ReportScreen> {
             height: 36,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: ExpenseCategories.background(cat),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.shopping_bag_outlined, size: 18, color: Color(0xFFDC2626)),
+            child: Icon(
+              ExpenseCategories.icons[cat] ?? Icons.receipt_long_outlined,
+              size: 16,
+              color: ExpenseCategories.textColor(cat),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  p['note'] as String,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: Color(0xFF0F172A),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: ExpenseCategories.background(cat),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        cat,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: ExpenseCategories.textColor(cat),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        p['note'] as String,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 2),
                 Text(

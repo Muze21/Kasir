@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../models/pos_models.dart';
 
 class DashboardExpenseDialog extends StatefulWidget {
-  final Future<void> Function(String note, double amount) onSubmit;
+  final Future<void> Function(String note, double amount, String category) onSubmit;
 
   const DashboardExpenseDialog({
     super.key,
@@ -15,6 +16,7 @@ class DashboardExpenseDialog extends StatefulWidget {
 class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
   final _noteCtrl = TextEditingController();
   final _amountCtrl = TextEditingController();
+  String _category = 'Operasional';
   bool _isSubmitting = false;
 
   @override
@@ -41,7 +43,7 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
 
     setState(() => _isSubmitting = true);
     try {
-      await widget.onSubmit(note, amount);
+      await widget.onSubmit(note, amount, _category);
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -88,6 +90,46 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
             const Text(
               'Biaya ini akan langsung memotong kas masuk bersih shift yang sedang berjalan.',
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'KATEGORI PENGELUARAN',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: ExpenseCategories.all.map((cat) {
+                final selected = _category == cat;
+                return ChoiceChip(
+                  label: Text(
+                    cat,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                      color: selected ? Colors.white : ExpenseCategories.textColor(cat),
+                    ),
+                  ),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _category = cat),
+                  selectedColor: ExpenseCategories.textColor(cat),
+                  backgroundColor: ExpenseCategories.background(cat),
+                  avatar: Icon(
+                    ExpenseCategories.icons[cat],
+                    size: 15,
+                    color: selected ? Colors.white : ExpenseCategories.textColor(cat),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: BorderSide(
+                      color: selected ? ExpenseCategories.textColor(cat) : ExpenseCategories.textColor(cat).withAlpha(40),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  visualDensity: VisualDensity.compact,
+                );
+              }).toList(),
             ),
             const SizedBox(height: 14),
             TextField(

@@ -55,6 +55,8 @@ create table if not exists public.expenses (
   shift_id uuid references public.shifts(id) on delete cascade,
   note text not null,
   amount numeric not null check (amount > 0),
+  category text not null default 'Operasional'
+    check (category in ('Bahan Baku', 'Operasional', 'Transport', 'Lainnya')),
   user_id uuid not null default auth.uid() references public.profiles(id),
   created_at timestamptz default now()
 );

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class Shift {
   final String id;
   final DateTime openedAt;
@@ -161,6 +163,7 @@ class Expense {
   final String id;
   final String note;
   final double amount;
+  final String category; // 'Bahan Baku' | 'Operasional' | 'Transport' | 'Lainnya'
   final String userId;
   final Profile? profile;
   final DateTime createdAt;
@@ -169,6 +172,7 @@ class Expense {
     required this.id,
     required this.note,
     required this.amount,
+    this.category = 'Operasional',
     required this.userId,
     this.profile,
     required this.createdAt,
@@ -179,10 +183,49 @@ class Expense {
       id: json['id'] as String,
       note: json['note'] as String,
       amount: (json['amount'] as num).toDouble(),
+      category: (json['category'] as String?) ?? 'Operasional',
       userId: json['user_id'] as String,
       profile: json['profiles'] != null ? Profile.fromJson(json['profiles']) : null,
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
     );
+  }
+}
+
+// Kategori pengeluaran tetap (satu-satunya sumber kebenaran biar konsisten di semua UI)
+class ExpenseCategories {
+  static const List<String> all = ['Bahan Baku', 'Operasional', 'Transport', 'Lainnya'];
+
+  static const Map<String, IconData> icons = {
+    'Bahan Baku': Icons.inventory_2_outlined,
+    'Operasional': Icons.handyman_outlined,
+    'Transport': Icons.local_shipping_outlined,
+    'Lainnya': Icons.more_horiz_outlined,
+  };
+
+  static Color background(String category) {
+    switch (category) {
+      case 'Bahan Baku':
+        return const Color(0xFFEDF3EC);
+      case 'Operasional':
+        return const Color(0xFFE1F3FE);
+      case 'Transport':
+        return const Color(0xFFFBF3DB);
+      default:
+        return const Color(0xFFF1F5F9);
+    }
+  }
+
+  static Color textColor(String category) {
+    switch (category) {
+      case 'Bahan Baku':
+        return const Color(0xFF346538);
+      case 'Operasional':
+        return const Color(0xFF1F6C9F);
+      case 'Transport':
+        return const Color(0xFF956400);
+      default:
+        return const Color(0xFF64748B);
+    }
   }
 }
 

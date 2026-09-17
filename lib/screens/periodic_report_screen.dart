@@ -687,6 +687,12 @@ class _PeriodicReportScreenState extends State<PeriodicReportScreen> {
 
   // Rincian Pengeluaran Operasional
   Widget _buildExpensesListCard(List<Expense> expenses) {
+    // Agregasi per kategori
+    final Map<String, double> byCat = {for (final c in ExpenseCategories.all) c: 0.0};
+    for (final e in expenses) {
+      byCat.update(e.category, (v) => v + e.amount, ifAbsent: () => e.amount);
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -712,6 +718,31 @@ class _PeriodicReportScreenState extends State<PeriodicReportScreen> {
               ),
             ],
           ),
+          // Sub-total per kategori (jika ada pengeluaran)
+          if (expenses.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: ExpenseCategories.all.where((c) => (byCat[c] ?? 0) > 0).map((cat) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: ExpenseCategories.background(cat),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '$cat ${_rupiah.format(byCat[cat]!)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: ExpenseCategories.textColor(cat),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 12),
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 8),
@@ -738,21 +769,47 @@ class _PeriodicReportScreenState extends State<PeriodicReportScreen> {
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFEF2F2),
+                        color: ExpenseCategories.background(e.category),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(Icons.arrow_downward, size: 14, color: Color(0xFFDC2626)),
+                      child: Icon(
+                        ExpenseCategories.icons[e.category] ?? Icons.receipt_long_outlined,
+                        size: 14,
+                        color: ExpenseCategories.textColor(e.category),
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            e.note,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: ExpenseCategories.background(e.category),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  e.category,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: ExpenseCategories.textColor(e.category),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  e.note,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                                ),
+                              ),
+                            ],
                           ),
                           Text(
                             '${_shortDateFmt.format(e.createdAt.toLocal())} • oleh ${e.profile?.fullName ?? 'anggota'}',

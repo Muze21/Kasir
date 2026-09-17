@@ -191,11 +191,13 @@ class DatabaseService {
     required String shiftId,
     required String note,
     required double amount,
+    String category = 'Operasional',
   }) async {
     await _supabase.from('expenses').insert({
       'shift_id': shiftId,
       'note': note,
       'amount': amount,
+      'category': category,
       'user_id': currentUserId,
     });
   }

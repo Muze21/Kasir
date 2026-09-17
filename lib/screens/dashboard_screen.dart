@@ -31,6 +31,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Expense> _recentExpenses = [];
   bool _isLoading = true;
   Timer? _clockTimer;
+  Timer? _autoRefreshTimer;
   DateTime _currentTime = DateTime.now();
 
   static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
@@ -56,12 +57,63 @@ class _DashboardScreenState extends State<DashboardScreen> {
         setState(() => _currentTime = DateTime.now());
       }
     });
+    // Auto-refresh ringan tiap 5 detik: hanya statistik & aktivitas,
+    // tidak menyentuh form/state lain. (ponytail: polling 5s cukup untuk 3-4 device;
+    // kalau transaksi sangat ramai, naikkan frekuensi atau ganti realtime.)
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _autoRefresh();
+    });
   }
 
   @override
   void dispose() {
     _clockTimer?.cancel();
+    _autoRefreshTimer?.cancel();
     super.dispose();
+  }
+
+  // Refresh ringan (tanpa spinner): update angka live + cek status shift
+  // (misal: shift dibuka/ditutup device lain, atau transaksi dari device lain).
+  Future<void> _autoRefresh() async {
+    if (_isLoading || !mounted) return;
+    try {
+      final shift = await _db.getActiveShift();
+
+      ShiftStats? stats;
+      List<Order> recent = [];
+      List<Expense> expenses = [];
+      Shift? lastClosed = _lastClosedShift;
+      Profile? opener = _opener;
+
+      if (shift == null) {
+        final closed = await _db.getLastClosedShift();
+        if (closed != null) lastClosed = closed;
+        stats = null;
+        recent = [];
+        expenses = [];
+      } else {
+        stats = await _db.getShiftStats(shift.id);
+        recent = await _db.getOrders(shift.id);
+        if (recent.length > 5) recent = recent.sublist(0, 5);
+        expenses = await _db.getExpenses(shift.id);
+        if (shift.id != _activeShift?.id || _opener == null) {
+          if (shift.openedBy != null) opener = await _db.getProfileById(shift.openedBy!);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _activeShift = shift;
+        _lastClosedShift = lastClosed;
+        _opener = opener;
+        _stats = stats;
+        _recentOrders = recent;
+        _recentExpenses = expenses;
+      });
+    } catch (_) {
+      // Auto-refresh gagal diabaikan supaya tidak mengganggu pemakaian;
+      // refresh manual/pull-to-refresh tetap tersedia.
+    }
   }
 
   Future<void> _loadData() async {
@@ -288,11 +340,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       builder: (_) => DashboardExpenseDialog(
-        onSubmit: (note, amount) async {
+        onSubmit: (note, amount, category) async {
           await _db.createExpense(
             shiftId: shift.id,
             amount: amount,
             note: note,
+            category: category,
           );
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
