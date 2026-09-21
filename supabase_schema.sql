@@ -116,6 +116,14 @@ alter table public.profiles enable row level security;
 alter table public.shifts enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
+alter table public.expenses enable row level security;
+
+create policy "Auth access profiles" on public.profiles for all to authenticated using (true) with check (true);
+create policy "Auth access shifts" on public.shifts for all to authenticated using (true) with check (true);
+create policy "Auth access orders" on public.orders for all to authenticated using (true) with check (true);
+create policy "Auth access order_items" on public.order_items for all to authenticated using (true) with check (true);
+create policy "Auth access expenses" on public.expenses for all to authenticated using (true) with check (true);
+
 -- 10. PRODUCTS / MENU TOKO
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),

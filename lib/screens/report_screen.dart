@@ -271,6 +271,33 @@ final pengeluaranList = expenses.map((e) {
           ],
         ),
         actions: [
+          if (!_loading && _error == null && _shift != null)
+            IconButton(
+              icon: const Icon(Icons.share_outlined, size: 21, color: Color(0xFF0F172A)),
+              tooltip: 'Bagikan Rekap Shift',
+              onPressed: () {
+                ReceiptService.showShareShiftReportModal(
+                  context: context,
+                  shiftStatus: _shift?.status ?? 'closed',
+                  openedAt: _shift?.openedAt ?? DateTime.now(),
+                  closedAt: _shift?.closedAt,
+                  openerName: _shift?.opener?.fullName,
+                  closerName: _shift?.closer?.fullName,
+                  omzet: _omzet,
+                  cashTotal: _mixCash,
+                  qrisTotal: _mixQris,
+                  cashCount: _cashCount,
+                  qrisCount: _qrisCount,
+                  expensesTotal: _pengeluaran,
+                  expenseCount: _pengeluaranList.length,
+                  bersih: _bersih,
+                  completedOrdersCount: _completedOrdersCount,
+                  voidedOrdersCount: _voidedOrdersCount,
+                  voidedTotal: _voidedTotal,
+                  perKasir: _perKasir,
+                );
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, size: 21, color: Color(0xFF64748B)),
             tooltip: 'Muat Ulang Data',

@@ -36,7 +36,6 @@ class _PosScreenState extends State<PosScreen> {
   String _paymentMethod = 'cash'; // 'cash' | 'qris'
   bool _isSubmitting = false;
   Timer? _clockTimer;
-  DateTime _currentTime = DateTime.now();
 
   // Preset Barang Toko (Dinamis dari Database / Fallback)
   List<Map<String, dynamic>> _presetItems = [
@@ -51,11 +50,6 @@ class _PosScreenState extends State<PosScreen> {
     _loadProducts();
     _cashInputCtrl.addListener(() {
       if (mounted) setState(() {});
-    });
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() => _currentTime = DateTime.now());
-      }
     });
   }
 
@@ -445,7 +439,6 @@ class _PosScreenState extends State<PosScreen> {
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: PosTopBar(
         shift: widget.shift,
-        currentTime: _currentTime,
         onOpenOrderHistory: _openOrderHistory,
         onViewReport: _viewReport,
         onCloseShift: _closeShift,

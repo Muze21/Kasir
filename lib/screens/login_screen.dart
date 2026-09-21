@@ -22,16 +22,66 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  final _emailFocusNode = FocusNode();
+  final _passwordFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _isLogin = true; // Toggle between Login and Register
+  bool _obscurePassword = true;
 
   Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (!_isLogin) {
+      final name = _nameController.text.trim();
+      if (name.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Nama lengkap wajib diisi.'),
+            backgroundColor: _Palette.ember,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Masukkan alamat email yang valid.'),
+          backgroundColor: _Palette.ember,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kata sandi tidak boleh kosong.'),
+          backgroundColor: _Palette.ember,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kata sandi minimal 6 karakter.'),
+          backgroundColor: _Palette.ember,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
-      final email = _emailController.text.trim();
-      final password = _passwordController.text;
-
       if (_isLogin) {
         // Proses Login
         await Supabase.instance.client.auth.signInWithPassword(
@@ -41,8 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         // Proses Register
         final name = _nameController.text.trim();
-        if (name.isEmpty) throw Exception('Nama lengkap wajib diisi.');
-
         await Supabase.instance.client.auth.signUp(
           email: email,
           password: password,
@@ -91,12 +139,15 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _nameController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
-  InputDecoration _fieldDecoration(String label) {
+  InputDecoration _fieldDecoration(String label, {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
+      suffixIcon: suffixIcon,
       // Eksplisit dimatikan — kalau tidak, field jatuh balik ke
       // InputDecorationTheme global (kalau ada filled:true di ThemeData),
       // dan hasilnya jadi kotak putih dengan shadow, bukan underline flat.
@@ -187,6 +238,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               controller: _nameController,
                               decoration: _fieldDecoration('Nama'),
                               textCapitalization: TextCapitalization.words,
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) => _emailFocusNode.requestFocus(),
                               style: const TextStyle(color: _Palette.ink, fontSize: 16),
                             ),
                           )
@@ -195,15 +248,39 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   TextField(
                     controller: _emailController,
+                    focusNode: _emailFocusNode,
                     decoration: _fieldDecoration('email'),
                     keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    onSubmitted: (_) {
+                      if (_passwordController.text.isEmpty) {
+                        _passwordFocusNode.requestFocus();
+                      } else {
+                        if (!_isLoading) _submit();
+                      }
+                    },
                     style: const TextStyle(color: _Palette.ink, fontSize: 16),
                   ),
                   const SizedBox(height: 22),
                   TextField(
                     controller: _passwordController,
-                    decoration: _fieldDecoration('password'),
-                    obscureText: true,
+                    focusNode: _passwordFocusNode,
+                    decoration: _fieldDecoration(
+                      'password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          size: 20,
+                          color: _Palette.sand,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                    obscureText: _obscurePassword,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) {
+                      if (!_isLoading) _submit();
+                    },
                     style: const TextStyle(color: _Palette.ink, fontSize: 16),
                   ),
                   const SizedBox(height: 36),

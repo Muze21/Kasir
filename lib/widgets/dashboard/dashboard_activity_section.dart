@@ -5,11 +5,15 @@ import '../../models/pos_models.dart';
 class DashboardActivitySection extends StatefulWidget {
   final List<Order> recentOrders;
   final List<Expense> recentExpenses;
+  final void Function(Expense expense)? onEditExpense;
+  final void Function(Expense expense)? onDeleteExpense;
 
   const DashboardActivitySection({
     super.key,
     required this.recentOrders,
     required this.recentExpenses,
+    this.onEditExpense,
+    this.onDeleteExpense,
   });
 
   @override
@@ -303,6 +307,24 @@ class _DashboardActivitySectionState extends State<DashboardActivitySection> {
               ],
             ),
           ),
+          const SizedBox(width: 4),
+          // Aksi Edit / Hapus (hanya jika callback dipasok, saat shift masih open)
+          if (widget.onEditExpense != null || widget.onDeleteExpense != null)
+            PopupMenuButton<String>(
+              onSelected: (choice) {
+                if (choice == 'edit') widget.onEditExpense?.call(expense);
+                if (choice == 'delete') widget.onDeleteExpense?.call(expense);
+              },
+              icon: const Icon(Icons.more_vert, size: 18, color: Color(0xFF94A3B8)),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              itemBuilder: (_) => [
+                if (widget.onEditExpense != null)
+                  const PopupMenuItem(value: 'edit', child: Text('Ubah', style: TextStyle(fontSize: 13))),
+                if (widget.onDeleteExpense != null)
+                  const PopupMenuItem(value: 'delete', child: Text('Hapus', style: TextStyle(fontSize: 13, color: Color(0xFFDC2626)))),
+              ],
+            ),
           const SizedBox(width: 8),
           FittedBox(
             fit: BoxFit.scaleDown,

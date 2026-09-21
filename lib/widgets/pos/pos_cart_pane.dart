@@ -198,10 +198,10 @@ class _PosCartPaneState extends State<PosCartPane> {
 
                     // Stepper Mini
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
@@ -209,15 +209,23 @@ class _PosCartPaneState extends State<PosCartPane> {
                         children: [
                           InkWell(
                             onTap: () => widget.onUpdateQty(index, -1),
-                            child: const Padding(padding: EdgeInsets.all(3), child: Icon(Icons.remove, size: 13)),
+                            borderRadius: BorderRadius.circular(6),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                              child: Icon(Icons.remove, size: 15, color: Color(0xFF0F172A)),
+                            ),
                           ),
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 6),
-                            child: Text('$qty', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                            child: Text('$qty', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
                           ),
                           InkWell(
                             onTap: () => widget.onUpdateQty(index, 1),
-                            child: const Padding(padding: EdgeInsets.all(3), child: Icon(Icons.add, size: 13)),
+                            borderRadius: BorderRadius.circular(6),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                              child: Icon(Icons.add, size: 15, color: Color(0xFF0F172A)),
+                            ),
                           ),
                         ],
                       ),
@@ -237,10 +245,10 @@ class _PosCartPaneState extends State<PosCartPane> {
                     // Tombol Hapus (Kompak agar tidak overflow)
                     InkWell(
                       onTap: () => widget.onRemoveItem(index),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(6),
                       child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.close, size: 15, color: Color(0xFF94A3B8)),
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.close, size: 16, color: Color(0xFF94A3B8)),
                       ),
                     ),
                   ],

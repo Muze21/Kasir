@@ -47,7 +47,7 @@ class DatabaseService {
   Future<void> closeShift(String shiftId) async {
     await _supabase.from('shifts').update({
       'status': 'closed',
-      'closed_at': DateTime.now().toIso8601String(),
+      'closed_at': DateTime.now().toUtc().toIso8601String(),
       'closed_by': currentUserId,
     }).eq('id', shiftId);
   }
@@ -142,12 +142,25 @@ class DatabaseService {
     required List<Map<String, dynamic>> items,
     String? customerName,
   }) async {
-    // 1. Hitung nomor antrean berikutnya di shift ini
-    final existingOrders = await _supabase
+    if (total <= 0) {
+      throw ArgumentError('Total transaksi harus lebih besar dari 0.');
+    }
+    if (items.isEmpty) {
+      throw ArgumentError('Daftar pesanan tidak boleh kosong.');
+    }
+
+    // 1. Hitung nomor antrean berikutnya di shift ini berdasarkan queue_number tertinggi
+    final lastOrder = await _supabase
         .from('orders')
-        .select('id')
-        .eq('shift_id', shiftId);
-    final nextQueueNumber = (existingOrders as List).length + 1;
+        .select('queue_number')
+        .eq('shift_id', shiftId)
+        .order('queue_number', ascending: false)
+        .limit(1)
+        .maybeSingle();
+        
+    final nextQueueNumber = lastOrder != null 
+        ? ((lastOrder['queue_number'] as num?)?.toInt() ?? 0) + 1 
+        : 1;
 
     // 2. Insert order
     final orderRes = await _supabase.from('orders').insert({
@@ -193,13 +206,46 @@ class DatabaseService {
     required double amount,
     String category = 'Operasional',
   }) async {
+    if (amount <= 0) {
+      throw ArgumentError('Nominal biaya harus lebih besar dari 0.');
+    }
+    if (note.trim().isEmpty) {
+      throw ArgumentError('Keterangan biaya tidak boleh kosong.');
+    }
+
     await _supabase.from('expenses').insert({
       'shift_id': shiftId,
-      'note': note,
+      'note': note.trim(),
       'amount': amount,
       'category': category,
       'user_id': currentUserId,
     });
+  }
+
+  // EDIT PENGELUARAN (UPDATE EXPENSE)
+  Future<void> updateExpense({
+    required String expenseId,
+    required String note,
+    required double amount,
+    required String category,
+  }) async {
+    if (amount <= 0) {
+      throw ArgumentError('Nominal biaya harus lebih besar dari 0.');
+    }
+    if (note.trim().isEmpty) {
+      throw ArgumentError('Keterangan biaya tidak boleh kosong.');
+    }
+
+    await _supabase.from('expenses').update({
+      'note': note.trim(),
+      'amount': amount,
+      'category': category,
+    }).eq('id', expenseId);
+  }
+
+  // HAPUS PENGELUARAN (DELETE EXPENSE)
+  Future<void> deleteExpense(String expenseId) async {
+    await _supabase.from('expenses').delete().eq('id', expenseId);
   }
 
   // AMBIL SEMUA ORDER DI SATU SHIFT (BESERTA ITEMS & PROFILE INPUT)
@@ -215,19 +261,11 @@ class DatabaseService {
 
   // BATALKAN / VOID ORDER
   Future<bool> voidOrder(String orderId, {String? reason}) async {
-    try {
-      // Coba soft-delete jika kolom status sudah ada di Supabase
-      await _supabase.from('orders').update({
-        'status': 'voided',
-        'void_reason': (reason != null && reason.trim().isNotEmpty) ? reason.trim() : 'Dibatalkan kasir',
-      }).eq('id', orderId);
-      return true;
-    } catch (_) {
-      // Fallback jika database belum ada kolom status:
-      // Lakukan hard-delete agar pesanan terhapus dan omzet shift tetap akurat
-      await _supabase.from('orders').delete().eq('id', orderId);
-      return false;
-    }
+    await _supabase.from('orders').update({
+      'status': 'voided',
+      'void_reason': (reason != null && reason.trim().isNotEmpty) ? reason.trim() : 'Dibatalkan kasir',
+    }).eq('id', orderId);
+    return true;
   }
 
   // AMBIL SEMUA PENGELUARAN DI SATU SHIFT
@@ -479,27 +517,25 @@ class DatabaseService {
     required double price,
     required String category,
   }) async {
-    final tempId = DateTime.now().millisecondsSinceEpoch.toString();
-    final newProduct = Product(
-      id: tempId,
-      name: name,
-      price: price,
-      category: category,
-    );
+    if (name.trim().isEmpty) {
+      throw ArgumentError('Nama menu tidak boleh kosong.');
+    }
+    if (price <= 0) {
+      throw ArgumentError('Harga menu harus lebih besar dari 0.');
+    }
 
     try {
       final res = await _supabase.from('products').insert({
-        'name': name,
+        'name': name.trim(),
         'price': price,
-        'category': category,
+        'category': category.trim(),
       }).select().single();
       final created = Product.fromJson(res);
-      _fallbackProducts.removeWhere((p) => p.id == tempId);
+      _fallbackProducts.removeWhere((p) => p.id == created.id);
       _fallbackProducts.add(created);
       return created;
-    } catch (_) {
-      _fallbackProducts.add(newProduct);
-      return newProduct;
+    } catch (e) {
+      rethrow;
     }
   }
 
@@ -509,33 +545,40 @@ class DatabaseService {
     required double price,
     required String category,
   }) async {
-    final index = _fallbackProducts.indexWhere((p) => p.id == id);
-    if (index >= 0) {
-      _fallbackProducts[index] = Product(
-        id: id,
-        name: name,
-        price: price,
-        category: category,
-      );
+    if (name.trim().isEmpty) {
+      throw ArgumentError('Nama menu tidak boleh kosong.');
+    }
+    if (price <= 0) {
+      throw ArgumentError('Harga menu harus lebih besar dari 0.');
     }
 
     try {
       await _supabase.from('products').update({
-        'name': name,
+        'name': name.trim(),
         'price': price,
-        'category': category,
+        'category': category.trim(),
       }).eq('id', id);
-    } catch (_) {
-      // Offline fallback updated
+
+      final index = _fallbackProducts.indexWhere((p) => p.id == id);
+      if (index >= 0) {
+        _fallbackProducts[index] = Product(
+          id: id,
+          name: name.trim(),
+          price: price,
+          category: category.trim(),
+        );
+      }
+    } catch (e) {
+      rethrow;
     }
   }
 
   Future<void> deleteProduct(String id) async {
-    _fallbackProducts.removeWhere((p) => p.id == id);
     try {
       await _supabase.from('products').delete().eq('id', id);
-    } catch (_) {
-      // Offline fallback deleted
+      _fallbackProducts.removeWhere((p) => p.id == id);
+    } catch (e) {
+      rethrow;
     }
   }
 }

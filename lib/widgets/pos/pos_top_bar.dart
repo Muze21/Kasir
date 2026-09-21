@@ -1,20 +1,19 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/pos_models.dart';
 
-class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
+class PosTopBar extends StatefulWidget implements PreferredSizeWidget {
   final Shift shift;
-  final DateTime currentTime;
+  final DateTime? currentTime;
   final VoidCallback onOpenOrderHistory;
   final VoidCallback onViewReport;
   final VoidCallback onCloseShift;
 
-  static final _waktu = DateFormat.Hm('id_ID');
-
   const PosTopBar({
     super.key,
     required this.shift,
-    required this.currentTime,
+    this.currentTime,
     required this.onOpenOrderHistory,
     required this.onViewReport,
     required this.onCloseShift,
@@ -24,10 +23,36 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 1);
 
   @override
+  State<PosTopBar> createState() => _PosTopBarState();
+}
+
+class _PosTopBarState extends State<PosTopBar> {
+  Timer? _timer;
+  DateTime _now = DateTime.now();
+  static final _waktu = DateFormat.Hm('id_ID');
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.currentTime == null) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _now = DateTime.now());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < 600;
-    final timeStr = DateFormat(isMobile ? 'HH:mm' : 'HH:mm:ss', 'id_ID').format(currentTime);
+    final timeToUse = widget.currentTime ?? _now;
+    final timeStr = DateFormat(isMobile ? 'HH:mm' : 'HH:mm:ss', 'id_ID').format(timeToUse);
 
     return AppBar(
       backgroundColor: Colors.white,
@@ -74,7 +99,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Buka ${_waktu.format(shift.openedAt.toLocal())}',
+                    'Buka ${_waktu.format(widget.shift.openedAt.toLocal())}',
                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
                   ),
                 ],
@@ -103,7 +128,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           icon: const Icon(Icons.receipt_long_outlined, size: 20, color: Color(0xFF0F172A)),
           tooltip: 'Riwayat Transaksi',
-          onPressed: onOpenOrderHistory,
+          onPressed: widget.onOpenOrderHistory,
         ),
 
         // Tombol Laporan
@@ -115,7 +140,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: onViewReport,
+            onPressed: widget.onViewReport,
             icon: const Icon(Icons.assessment_outlined, size: 16),
             label: const Text('Rekap Sesi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
           ),
@@ -124,7 +149,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
           IconButton(
             icon: const Icon(Icons.assessment_outlined, size: 20, color: Color(0xFF0F172A)),
             tooltip: 'Laporan Sesi',
-            onPressed: onViewReport,
+            onPressed: widget.onViewReport,
           ),
         ],
 
@@ -132,7 +157,7 @@ class PosTopBar extends StatelessWidget implements PreferredSizeWidget {
         IconButton(
           icon: const Icon(Icons.lock_outline, size: 20, color: Color(0xFFDC2626)),
           tooltip: 'Tutup Shift',
-          onPressed: onCloseShift,
+          onPressed: widget.onCloseShift,
         ),
         const SizedBox(width: 6),
       ],

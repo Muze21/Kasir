@@ -209,30 +209,43 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 final messenger = ScaffoldMessenger.of(context);
                 setState(() => _isLoading = true);
 
-                if (isEditing) {
-                  await _db.updateProduct(
-                    id: product.id,
-                    name: name,
-                    price: price,
-                    category: finalCat,
-                  );
-                } else {
-                  await _db.addProduct(
-                    name: name,
-                    price: price,
-                    category: finalCat,
-                  );
-                }
+                try {
+                  if (isEditing) {
+                    await _db.updateProduct(
+                      id: product.id,
+                      name: name,
+                      price: price,
+                      category: finalCat,
+                    );
+                  } else {
+                    await _db.addProduct(
+                      name: name,
+                      price: price,
+                      category: finalCat,
+                    );
+                  }
 
-                _loadProducts();
-                if (mounted) {
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(isEditing ? 'Menu berhasil diperbarui' : 'Menu baru berhasil ditambahkan'),
-                      backgroundColor: const Color(0xFF059669),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  _loadProducts();
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(isEditing ? 'Menu berhasil diperbarui' : 'Menu baru berhasil ditambahkan'),
+                        backgroundColor: const Color(0xFF059669),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    setState(() => _isLoading = false);
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Gagal menyimpan menu: $e'),
+                        backgroundColor: const Color(0xFFDC2626),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
                 }
               },
               child: Text(isEditing ? 'Simpan Perubahan' : 'Tambah Menu'),
@@ -272,15 +285,28 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
 
     if (confirm == true) {
       setState(() => _isLoading = true);
-      await _db.deleteProduct(product.id);
-      _loadProducts();
-      if (mounted) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Menu berhasil dihapus'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      try {
+        await _db.deleteProduct(product.id);
+        _loadProducts();
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Menu berhasil dihapus'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('Gagal menghapus menu: $e'),
+              backgroundColor: const Color(0xFFDC2626),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     }
   }

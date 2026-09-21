@@ -30,33 +30,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Order> _recentOrders = [];
   List<Expense> _recentExpenses = [];
   bool _isLoading = true;
-  Timer? _clockTimer;
   Timer? _autoRefreshTimer;
-  DateTime _currentTime = DateTime.now();
 
   static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
   // Perhitungan pembayaran Tunai & QRIS dari transaksi sesi aktif
   double get _totalCash => _recentOrders
-      .where((o) => o.paymentMethod == 'cash')
+      .where((o) => o.paymentMethod == 'cash' && !o.isVoided)
       .fold(0.0, (sum, o) => sum + o.totalAmount);
 
   double get _totalQris => _recentOrders
-      .where((o) => o.paymentMethod == 'qris')
+      .where((o) => o.paymentMethod == 'qris' && !o.isVoided)
       .fold(0.0, (sum, o) => sum + o.totalAmount);
 
-  int get _cashOrderCount => _recentOrders.where((o) => o.paymentMethod == 'cash').length;
-  int get _qrisOrderCount => _recentOrders.where((o) => o.paymentMethod == 'qris').length;
+  int get _cashOrderCount => _recentOrders.where((o) => o.paymentMethod == 'cash' && !o.isVoided).length;
+  int get _qrisOrderCount => _recentOrders.where((o) => o.paymentMethod == 'qris' && !o.isVoided).length;
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) {
-        setState(() => _currentTime = DateTime.now());
-      }
-    });
     // Auto-refresh ringan tiap 5 detik: hanya statistik & aktivitas,
     // tidak menyentuh form/state lain. (ponytail: polling 5s cukup untuk 3-4 device;
     // kalau transaksi sangat ramai, naikkan frekuensi atau ganti realtime.)
@@ -67,7 +60,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
-    _clockTimer?.cancel();
     _autoRefreshTimer?.cancel();
     super.dispose();
   }
@@ -333,31 +325,97 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _showAddExpenseDialog() {
+  Future<void> _confirmDeleteExpense(Expense expense) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        title: const Text('Hapus Pengeluaran?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Text('"${expense.note}" (${NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0).format(expense.amount)}) akan dihapus dari shift ini.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDC2626),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Ya, Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+    try {
+      await _db.deleteExpense(expense.id);
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Pengeluaran berhasil dihapus.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      _loadData();
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Gagal menghapus pengeluaran: $e'),
+          backgroundColor: const Color(0xFFDC2626),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _showAddExpenseDialog({Expense? expense}) {
     final shift = _activeShift;
     if (shift == null) return;
 
+    final isEdit = expense != null;
     showDialog(
       context: context,
       builder: (_) => DashboardExpenseDialog(
+        initialNote: expense?.note,
+        initialAmount: expense?.amount,
+        initialCategory: expense?.category ?? 'Operasional',
         onSubmit: (note, amount, category) async {
-          await _db.createExpense(
-            shiftId: shift.id,
-            amount: amount,
-            note: note,
-            category: category,
-          );
+          if (isEdit) {
+            await _db.updateExpense(
+              expenseId: expense.id,
+              note: note,
+              amount: amount,
+              category: category,
+            );
+          } else {
+            await _db.createExpense(
+              shiftId: shift.id,
+              amount: amount,
+              note: note,
+              category: category,
+            );
+          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Biaya operasional berhasil dicatat.'),
-                backgroundColor: Color(0xFF059669),
+              SnackBar(
+                content: Text(isEdit ? 'Pengeluaran berhasil diperbarui.' : 'Biaya operasional berhasil dicatat.'),
+                backgroundColor: const Color(0xFF059669),
                 behavior: SnackBarBehavior.floating,
               ),
             );
             _loadData();
           }
         },
+        onDelete: isEdit
+            ? () => _db.deleteExpense(expense.id)
+            : null,
       ),
     );
   }
@@ -396,7 +454,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       DashboardGreetingBanner(
                         profile: _profile,
                         isOpen: _activeShift != null,
-                        currentTime: _currentTime,
                       ),
 
                       const SizedBox(height: 16),
@@ -425,6 +482,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         DashboardActivitySection(
                           recentOrders: _recentOrders,
                           recentExpenses: _recentExpenses,
+                          onEditExpense: (e) => _showAddExpenseDialog(expense: e),
+                          onDeleteExpense: (e) => _confirmDeleteExpense(e),
                         ),
                       ] else ...[
                         DashboardClosedShift(
