@@ -35,20 +35,22 @@ class DatabaseService {
   }
 
   // BUKA TOKO (OPEN SHIFT)
-  Future<Shift> openShift() async {
+  Future<Shift> openShift({double initialCash = 0}) async {
     final res = await _supabase.from('shifts').insert({
       'opened_by': currentUserId,
       'status': 'open',
+      'initial_cash': initialCash,
     }).select().single();
     return Shift.fromJson(res);
   }
 
   // TUTUP TOKO (CLOSE SHIFT)
-  Future<void> closeShift(String shiftId) async {
+  Future<void> closeShift(String shiftId, {double? actualCash}) async {
     await _supabase.from('shifts').update({
       'status': 'closed',
       'closed_at': DateTime.now().toUtc().toIso8601String(),
       'closed_by': currentUserId,
+      'actual_cash': actualCash,
     }).eq('id', shiftId);
   }
 
@@ -310,7 +312,9 @@ class DatabaseService {
 
     double totalExpenses = 0;
     for (final e in expenses) {
-      totalExpenses += e.amount;
+      if (e.category.toLowerCase() != 'pribadi') {
+        totalExpenses += e.amount;
+      }
     }
 
     // Breakdown per user
@@ -326,6 +330,7 @@ class DatabaseService {
     }
 
     for (final e in expenses) {
+      if (e.category.toLowerCase() == 'pribadi') continue; // Jangan bebankan prive ke user
       final uid = e.userId;
       final name = e.profile?.fullName ?? 'User ($uid)';
       userMap.putIfAbsent(uid, () => _UserStatsAcc(userId: uid, userName: name));
@@ -405,7 +410,9 @@ class DatabaseService {
 
     double totalExpenses = 0;
     for (final e in expenses) {
-      totalExpenses += e.amount;
+      if (e.category.toLowerCase() != 'pribadi') {
+        totalExpenses += e.amount;
+      }
     }
 
     // 4. Hitung Top Selling Items (Menu Terlaris)
@@ -449,6 +456,8 @@ class DatabaseService {
     }
 
     for (final e in expenses) {
+      if (e.category.toLowerCase() == 'pribadi') continue; // Prive tidak memotong laba harian
+
       final localDate = e.createdAt.toLocal();
       final key = '${localDate.year}-${localDate.month.toString().padLeft(2, '0')}-${localDate.day.toString().padLeft(2, '0')}';
       if (dailyMap.containsKey(key)) {

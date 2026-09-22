@@ -19,7 +19,9 @@ create table if not exists public.shifts (
   closed_at timestamptz,
   status text check (status in ('open', 'closed')) default 'open',
   opened_by uuid default auth.uid() references public.profiles(id),
-  closed_by uuid references public.profiles(id)
+  closed_by uuid references public.profiles(id),
+  initial_cash numeric default 0,   -- Modal awal yang dimasukkan ke laci saat buka toko
+  actual_cash  numeric               -- Uang fisik yang dihitung kasir saat tutup toko
 );
 
 -- 3. ORDERS (satu keranjang/pesanan pelanggan)
@@ -56,7 +58,7 @@ create table if not exists public.expenses (
   note text not null,
   amount numeric not null check (amount > 0),
   category text not null default 'Operasional'
-    check (category in ('Bahan Baku', 'Operasional', 'Transport', 'Lainnya')),
+    check (category in ('Bahan Baku', 'Operasional', 'Transport', 'Pribadi', 'Lainnya')),
   user_id uuid not null default auth.uid() references public.profiles(id),
   created_at timestamptz default now()
 );
@@ -149,3 +151,7 @@ on conflict do nothing;
 -- 11. MIGRATION HELPER (Jalankan jika database lama belum ada kolom status & void_reason):
 -- alter table public.orders add column if not exists status text check (status in ('completed', 'voided')) default 'completed';
 -- alter table public.orders add column if not exists void_reason text;
+
+-- 12. MIGRATION HELPER - Modal Awal & Rekonsiliasi Laci (jalankan di database yang sudah ada):
+-- alter table public.shifts add column if not exists initial_cash numeric default 0;
+-- alter table public.shifts add column if not exists actual_cash numeric;

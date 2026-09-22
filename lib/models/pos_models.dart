@@ -9,6 +9,8 @@ class Shift {
   final DateTime? closedAt;
   final Profile? opener;
   final Profile? closer;
+  final double initialCash;   // Modal awal laci saat buka toko
+  final double? actualCash;   // Uang fisik dihitung kasir saat tutup toko
 
   Shift({
     required this.id,
@@ -19,6 +21,8 @@ class Shift {
     this.closedAt,
     this.opener,
     this.closer,
+    this.initialCash = 0,
+    this.actualCash,
   });
 
   bool get isOpen => status == 'open';
@@ -33,6 +37,8 @@ class Shift {
       closedAt: json['closed_at'] != null ? DateTime.parse(json['closed_at'] as String).toLocal() : null,
       opener: json['opener'] != null ? Profile.fromJson(json['opener']) : null,
       closer: json['closer'] != null ? Profile.fromJson(json['closer']) : null,
+      initialCash: (json['initial_cash'] as num?)?.toDouble() ?? 0,
+      actualCash: (json['actual_cash'] as num?)?.toDouble(),
     );
   }
 }
@@ -40,11 +46,19 @@ class Shift {
 class ShiftStats {
   final int orderCount;
   final double omzet;
-  final double expenses;
-  final double bersih;
+  final double expenses; // Hanya beban operasional toko
+  final double prive;    // Pengeluaran pribadi (prive)
+  final double bersih;   // omzet - expenses (tanpa memotong prive)
 
-  ShiftStats({required this.orderCount, required this.omzet, required this.expenses})
-      : bersih = omzet - expenses;
+  // Total kas keluar yang memotong laci (expenses + prive)
+  double get totalKasKeluar => expenses + prive;
+
+  ShiftStats({
+    required this.orderCount,
+    required this.omzet,
+    required this.expenses,
+    this.prive = 0,
+  }) : bersih = omzet - expenses;
 
   factory ShiftStats.fromData({required int orderCount, required List<dynamic> orders, required List<dynamic> expenses}) {
     var omzet = 0.0;
@@ -55,11 +69,20 @@ class ShiftStats {
       omzet += (o['total_amount'] as num).toDouble();
       activeOrdersCount++;
     }
+
     var exp = 0.0;
+    var prv = 0.0;
     for (final e in expenses) {
-      exp += (e['amount'] as num).toDouble();
+      final amt = (e['amount'] as num).toDouble();
+      final cat = (e['category'] as String?) ?? 'Operasional';
+      if (cat.toLowerCase() == 'pribadi') {
+        prv += amt;
+      } else {
+        exp += amt;
+      }
     }
-    return ShiftStats(orderCount: activeOrdersCount, omzet: omzet, expenses: exp);
+
+    return ShiftStats(orderCount: activeOrdersCount, omzet: omzet, expenses: exp, prive: prv);
   }
 }
 
@@ -193,12 +216,13 @@ class Expense {
 
 // Kategori pengeluaran tetap (satu-satunya sumber kebenaran biar konsisten di semua UI)
 class ExpenseCategories {
-  static const List<String> all = ['Bahan Baku', 'Operasional', 'Transport', 'Lainnya'];
+  static const List<String> all = ['Bahan Baku', 'Operasional', 'Transport', 'Pribadi', 'Lainnya'];
 
   static const Map<String, IconData> icons = {
     'Bahan Baku': Icons.inventory_2_outlined,
     'Operasional': Icons.handyman_outlined,
     'Transport': Icons.local_shipping_outlined,
+    'Pribadi': Icons.person_outline,
     'Lainnya': Icons.more_horiz_outlined,
   };
 
@@ -210,6 +234,8 @@ class ExpenseCategories {
         return const Color(0xFFE1F3FE);
       case 'Transport':
         return const Color(0xFFFBF3DB);
+      case 'Pribadi':
+        return const Color(0xFFF3E8FF);
       default:
         return const Color(0xFFF1F5F9);
     }
@@ -223,6 +249,8 @@ class ExpenseCategories {
         return const Color(0xFF1F6C9F);
       case 'Transport':
         return const Color(0xFF956400);
+      case 'Pribadi':
+        return const Color(0xFF7E22CE);
       default:
         return const Color(0xFF64748B);
     }
