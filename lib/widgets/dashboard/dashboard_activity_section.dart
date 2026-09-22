@@ -135,7 +135,7 @@ class _DashboardActivitySectionState extends State<DashboardActivitySection> {
             onTap: () => setState(() => _activityFilterIndex = 1),
           ),
           _ActivityFilterTab(
-            label: 'Biaya (${widget.recentExpenses.length})',
+            label: 'Kas Keluar (${widget.recentExpenses.length})',
             isSelected: _activityFilterIndex == 2,
             onTap: () => setState(() => _activityFilterIndex = 2),
           ),

@@ -154,8 +154,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _openShift() async {
+    // Dialog input Modal Awal sebelum buka toko
+    final result = await showDialog<double>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _OpenShiftDialog(),
+    );
+    if (result == null || !mounted) return; // user tekan Batal
+
     try {
-      final shift = await _db.openShift();
+      final shift = await _db.openShift(initialCash: result);
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (_) => PosScreen(shift: shift)))
           .then((_) => _loadData());
@@ -193,111 +201,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final shift = _activeShift;
     if (shift == null) return;
 
-    final confirm = await showDialog<bool>(
+    // Hitung seharusnya di laci: Modal Awal + Penjualan Tunai - Semua Kas Keluar (Beban + Pribadi)
+    final totalKasKeluar = _stats?.totalKasKeluar ?? 0;
+    final seharusnya = shift.initialCash + _totalCash - totalKasKeluar;
+
+    final result = await showDialog<double>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFFE2E8F0)),
-        ),
-        title: const Row(
-          children: [
-            Icon(Icons.lock_clock_outlined, size: 22, color: Color(0xFFDC2626)),
-            SizedBox(width: 8),
-            Text(
-              'Tutup Sesi Toko?',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
-                letterSpacing: -0.3,
-              ),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Pastikan uang tunai di laci kasir dan semua transaksi telah sesuai. Laporan shift lengkap akan otomatis dibuat.',
-              style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total Transaksi:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                      Text('${_stats?.orderCount ?? 0} pesanan', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total Penjualan:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                      Text(_rupiah.format(_stats?.omzet ?? 0), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Kas Keluar (Biaya):', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                      Text('-${_rupiah.format(_stats?.expenses ?? 0)}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFDC2626))),
-                    ],
-                  ),
-                  const Divider(height: 16, color: Color(0xFFE2E8F0)),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Kas Masuk Bersih:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                      Text(_rupiah.format(_stats?.bersih ?? 0), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF059669))),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F172A),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.lock_outline, size: 16),
-            label: const Text('Tutup & Lihat Laporan'),
-          ),
-        ],
+      barrierDismissible: false,
+      builder: (ctx) => _CloseShiftDialog(
+        stats: _stats,
+        totalCash: _totalCash,
+        totalQris: _totalQris,
+        initialCash: shift.initialCash,
+        seharusnya: seharusnya,
+        rupiah: _rupiah,
       ),
     );
-
-    if (confirm != true || !mounted) return;
+    if (result == null || !mounted) return; // user tekan Batal
 
     final messenger = ScaffoldMessenger.of(context);
     final nav = Navigator.of(context);
     setState(() => _isLoading = true);
 
     try {
-      await _db.closeShift(shift.id);
+      await _db.closeShift(shift.id, actualCash: result);
       if (!mounted) return;
       messenger.showSnackBar(
         const SnackBar(
@@ -405,7 +332,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(isEdit ? 'Pengeluaran berhasil diperbarui.' : 'Biaya operasional berhasil dicatat.'),
+                content: Text(isEdit ? 'Pengeluaran berhasil diperbarui.' : 'Kas keluar berhasil dicatat.'),
                 backgroundColor: const Color(0xFF059669),
                 behavior: SnackBarBehavior.floating,
               ),
@@ -498,6 +425,361 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
               ),
             ),
+    );
+  }
+}
+
+// ─── Dialog: Buka Toko — Input Modal Awal ────────────────────────────────────
+class _OpenShiftDialog extends StatefulWidget {
+  @override
+  State<_OpenShiftDialog> createState() => _OpenShiftDialogState();
+}
+
+class _OpenShiftDialogState extends State<_OpenShiftDialog> {
+  final _ctrl = TextEditingController();
+  static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _setNominal(double val) {
+    setState(() => _ctrl.text = val.toInt().toString());
+  }
+
+  double get _parsed => double.tryParse(_ctrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      title: const Row(
+        children: [
+          Icon(Icons.store_outlined, size: 22, color: Color(0xFF059669)),
+          SizedBox(width: 8),
+          Text(
+            'Buka Toko',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), letterSpacing: -0.3),
+          ),
+        ],
+      ),
+      content: StatefulBuilder(
+        builder: (ctx, setSt) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Masukkan jumlah uang kembalian (modal awal) yang diletakkan di laci kasir sebelum toko dibuka.',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _ctrl,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                onChanged: (_) => setSt(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Modal Awal di Laci',
+                  hintText: '0',
+                  prefixText: 'Rp ',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Quick chips nominal umum modal awal
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [50000, 100000, 150000, 200000].map((val) {
+                  return ActionChip(
+                    label: Text(_rupiah.format(val), style: const TextStyle(fontSize: 11)),
+                    backgroundColor: const Color(0xFFF0FDF4),
+                    side: const BorderSide(color: Color(0xFF86EFAC)),
+                    onPressed: () {
+                      _setNominal(val.toDouble());
+                      setSt(() {});
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 6),
+              // Opsi Tanpa Modal Awal
+              ActionChip(
+                label: const Text('Tanpa Modal Awal (Rp 0)', style: TextStyle(fontSize: 11)),
+                backgroundColor: const Color(0xFFF8FAFC),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                onPressed: () {
+                  _setNominal(0);
+                  setSt(() {});
+                },
+              ),
+            ],
+          );
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+        ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF059669),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: () => Navigator.pop(context, _parsed),
+          icon: const Icon(Icons.store_outlined, size: 16),
+          label: const Text('Buka Toko'),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Dialog: Tutup Toko — Input Uang Fisik & Rekonsiliasi Laci ───────────────
+class _CloseShiftDialog extends StatefulWidget {
+  final ShiftStats? stats;
+  final double totalCash;
+  final double totalQris;
+  final double initialCash;
+  final double seharusnya;
+  final NumberFormat rupiah;
+
+  const _CloseShiftDialog({
+    required this.stats,
+    required this.totalCash,
+    required this.totalQris,
+    required this.initialCash,
+    required this.seharusnya,
+    required this.rupiah,
+  });
+
+  @override
+  State<_CloseShiftDialog> createState() => _CloseShiftDialogState();
+}
+
+class _CloseShiftDialogState extends State<_CloseShiftDialog> {
+  final _ctrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  double get _actualCash => double.tryParse(_ctrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  double get _selisih => _actualCash - widget.seharusnya;
+  bool get _hasInput => _ctrl.text.trim().isNotEmpty;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      title: const Row(
+        children: [
+          Icon(Icons.lock_clock_outlined, size: 22, color: Color(0xFFDC2626)),
+          SizedBox(width: 8),
+          Text(
+            'Tutup Sesi Toko',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF0F172A), letterSpacing: -0.3),
+          ),
+        ],
+      ),
+      content: StatefulBuilder(
+        builder: (ctx, setSt) {
+          final selisih = _selisih;
+          final lebih = selisih >= 0;
+
+          return SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Ringkasan Rekonsiliasi
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    children: [
+                      _RekonRow('Modal Awal Laci', widget.rupiah.format(widget.initialCash), isPositive: true),
+                      _RekonRow('+ Penjualan Tunai', widget.rupiah.format(widget.totalCash), isPositive: true),
+                      _RekonRow('- Semua Kas Keluar', widget.rupiah.format(widget.stats?.totalKasKeluar ?? 0), isNegative: true),
+                      const Divider(height: 14, color: Color(0xFFE2E8F0)),
+                      _RekonRow(
+                        'Seharusnya di Laci',
+                        widget.rupiah.format(widget.seharusnya),
+                        isBold: true,
+                      ),
+                      const SizedBox(height: 4),
+                      _RekonRow('+ QRIS (tidak di laci)', widget.rupiah.format(widget.totalQris), isInfo: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                // Input uang fisik
+                TextField(
+                  controller: _ctrl,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setSt(() {}),
+                  decoration: const InputDecoration(
+                    labelText: 'Uang Fisik yang Dihitung di Laci',
+                    hintText: '0',
+                    prefixText: 'Rp ',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                // Chip uang pas
+                const SizedBox(height: 8),
+                ActionChip(
+                  label: Text(
+                    'Pas ${widget.rupiah.format(widget.seharusnya)}',
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                  backgroundColor: const Color(0xFFECFDF5),
+                  side: const BorderSide(color: Color(0xFF6EE7B7)),
+                  onPressed: () {
+                    _ctrl.text = widget.seharusnya.toInt().toString();
+                    setSt(() {});
+                  },
+                ),
+                // Selisih (muncul saat ada input)
+                if (_hasInput) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: lebih ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: lebih ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              lebih ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                              size: 16,
+                              color: lebih ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              lebih ? 'Selisih Lebih' : 'Selisih Kurang',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: lebih ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${lebih ? '+' : ''}${widget.rupiah.format(selisih)}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                            color: lebih ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+        ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF0F172A),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+          onPressed: () => Navigator.pop(context, _actualCash),
+          icon: const Icon(Icons.lock_outline, size: 16),
+          label: const Text('Tutup & Lihat Laporan'),
+        ),
+      ],
+    );
+  }
+}
+
+// Helper row rekonsiliasi
+class _RekonRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isPositive;
+  final bool isNegative;
+  final bool isBold;
+  final bool isInfo;
+
+  const _RekonRow(
+    this.label,
+    this.value, {
+    this.isPositive = false,
+    this.isNegative = false,
+    this.isBold = false,
+    this.isInfo = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isNegative
+        ? const Color(0xFFDC2626)
+        : isInfo
+            ? const Color(0xFF4F46E5)
+            : const Color(0xFF0F172A);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isInfo ? const Color(0xFF4F46E5) : const Color(0xFF64748B),
+              fontStyle: isInfo ? FontStyle.italic : FontStyle.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isBold ? 13 : 12,
+              fontWeight: isBold ? FontWeight.w800 : FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

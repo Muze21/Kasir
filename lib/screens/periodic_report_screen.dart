@@ -430,7 +430,7 @@ class _PeriodicReportScreenState extends State<PeriodicReportScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: _BentoSummaryTile(
-            title: 'Biaya Operasional',
+            title: 'Pengeluaran Kasir',
             value: '-${_rupiah.format(report.totalExpenses)}',
             subtitle: '${report.expenses.length} pos biaya',
             icon: Icons.receipt_long_outlined,
@@ -708,7 +708,7 @@ class _PeriodicReportScreenState extends State<PeriodicReportScreen> {
               const Icon(Icons.receipt_outlined, size: 18, color: Color(0xFFDC2626)),
               const SizedBox(width: 8),
               const Text(
-                'Rincian Biaya Operasional',
+                'Rincian Kas Keluar / Pengeluaran',
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
               ),
               const Spacer(),

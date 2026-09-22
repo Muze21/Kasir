@@ -33,6 +33,7 @@ class _ReportScreenState extends State<ReportScreen> {
   int _voidedOrdersCount = 0;
   double _voidedTotal = 0.0;
   double _pengeluaran = 0.0;
+  double _prive = 0.0; // Tambahan untuk memisahkan Prive
   double _bersih = 0.0;
 
   double _mixCash = 0.0;
@@ -116,8 +117,15 @@ class _ReportScreenState extends State<ReportScreen> {
       }
 
       double totalExp = 0.0;
+      double totalPrive = 0.0;
       for (final e in expenses) {
-        totalExp += (e['amount'] as num).toDouble();
+        final amt = (e['amount'] as num).toDouble();
+        final cat = (e['category'] as String?) ?? 'Operasional';
+        if (cat.toLowerCase() == 'pribadi') {
+          totalPrive += amt;
+        } else {
+          totalExp += amt;
+        }
       }
 
       final bersih = omzet - totalExp;
@@ -169,6 +177,9 @@ final pengeluaranList = expenses.map((e) {
       }
 
       for (final e in expenses) {
+        final cat = (e['category'] as String?) ?? 'Operasional';
+        if (cat.toLowerCase() == 'pribadi') continue; // Prive tidak memotong laba per kasir
+
         final uid = e['user_id'] as String;
         final prof = e['profiles'];
         final nama = prof != null ? (prof['full_name'] as String) : 'User ($uid)';
@@ -197,6 +208,7 @@ final pengeluaranList = expenses.map((e) {
         _voidedOrdersCount = voidedOrders;
         _voidedTotal = voidedTotal;
         _pengeluaran = totalExp;
+        _prive = totalPrive;
         _bersih = bersih;
         _mixCash = cCash;
         _mixQris = cQris;
@@ -363,6 +375,12 @@ final pengeluaranList = expenses.map((e) {
                         // 3. Bento Grid 4 Metrik
                         _buildBentoMetricsGrid(isMobile),
 
+                        // 3b. Rekonsiliasi Laci Kasir (hanya tampil jika shift sudah closed)
+                        if (!isOpen && _shift != null && (_shift!.initialCash > 0 || _shift!.actualCash != null)) ...[
+                          const SizedBox(height: 14),
+                          _buildRekonsiliasiLaci(),
+                        ],
+
                         if (_pengeluaranList.isNotEmpty) ...[
                           const SizedBox(height: 18),
 
@@ -390,6 +408,128 @@ final pengeluaranList = expenses.map((e) {
   }
 
   // --- WIDGET KOMPONEN ---
+
+  Widget _buildRekonsiliasiLaci() {
+    final shift = _shift!;
+    final initialCash = shift.initialCash;
+    final actualCash = shift.actualCash;
+
+    // Untuk rekonsiliasi laci, yang memotong uang fisik adalah SEMUA pengeluaran (Beban + Prive)
+    final totalKasKeluar = _pengeluaran + _prive;
+    final seharusnya = initialCash + _mixCash - totalKasKeluar;
+
+    final selisih = actualCash != null ? actualCash - seharusnya : null;
+    final lebih = selisih != null && selisih >= 0;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, size: 15, color: Color(0xFF0F172A)),
+              SizedBox(width: 6),
+              Text(
+                'REKONSILIASI LACI KASIR',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.8,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          const SizedBox(height: 10),
+          _RLRow('Modal Awal Laci', _rupiah.format(initialCash)),
+          _RLRow('+ Penjualan Tunai', _rupiah.format(_mixCash), valueColor: const Color(0xFF059669)),
+          _RLRow('- Semua Kas Keluar (Termasuk Prive)', '-${_rupiah.format(totalKasKeluar)}', valueColor: const Color(0xFFDC2626)),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 6),
+            child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+          ),
+          _RLRow(
+            'Seharusnya di Laci',
+            _rupiah.format(seharusnya),
+            isBold: true,
+          ),
+          const SizedBox(height: 4),
+          _RLRow(
+            'QRIS (masuk rekening, bukan laci)',
+            _rupiah.format(_mixQris),
+            labelColor: const Color(0xFF4F46E5),
+            valueColor: const Color(0xFF4F46E5),
+            isItalic: true,
+          ),
+          if (actualCash != null) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+            ),
+            _RLRow('Uang Fisik Dihitung', _rupiah.format(actualCash), isBold: true),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: lebih ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: lebih ? const Color(0xFF86EFAC) : const Color(0xFFFCA5A5),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        lebih ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                        size: 15,
+                        color: lebih ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        selisih == 0 ? 'Laci Pas ✓' : lebih ? 'Selisih Lebih' : 'Selisih Kurang',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: lebih ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    selisih == 0
+                        ? 'Rp 0'
+                        : '${lebih ? '+' : ''}${_rupiah.format(selisih)}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: lebih ? const Color(0xFF059669) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            const Text(
+              'Uang fisik tidak dicatat saat tutup shift.',
+              style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _buildShiftSessionBanner(bool isOpen) {
     final openedAt = _shift?.openedAt;
@@ -500,7 +640,7 @@ final pengeluaranList = expenses.map((e) {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'KAS MASUK BERSIH SAAT INI',
+                      'LABA BERSIH TOKO SAAT INI',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -591,7 +731,7 @@ final pengeluaranList = expenses.map((e) {
               _buildPaymentLegend(
                 dotColor: const Color(0xFF059669),
                 label: 'Tunai di Laci:',
-                value: _rupiah.format(_mixCash),
+                value: _rupiah.format(_mixCash - _pengeluaran),
                 count: '$_cashCount trx',
               ),
               _buildPaymentLegend(
@@ -600,6 +740,13 @@ final pengeluaranList = expenses.map((e) {
                 value: _rupiah.format(_mixQris),
                 count: '$_qrisCount trx',
               ),
+              if (_pengeluaran > 0)
+                _buildPaymentLegend(
+                  dotColor: const Color(0xFFDC2626),
+                  label: 'Kas Keluar:',
+                  value: '-${_rupiah.format(_pengeluaran)}',
+                  count: '',
+                ),
             ],
           ),
         ],
@@ -610,12 +757,22 @@ final pengeluaranList = expenses.map((e) {
   Widget _buildExpenseCategoryBreakdown() {
     final Map<String, double> byCat = {for (final c in ExpenseCategories.all) c: 0.0};
     double grand = 0.0;
+    double priveAmount = 0.0;
+
     for (final p in _pengeluaranList) {
       final cat = (p['category'] as String?) ?? 'Operasional';
       final amt = (p['amount'] as num).toDouble();
+
       byCat.update(cat, (v) => v + amt, ifAbsent: () => amt);
       grand += amt;
+
+      if (cat.toLowerCase() == 'pribadi') {
+        priveAmount += amt;
+      }
     }
+
+    // Hanya beban operasional (grand - prive)
+    final operasional = grand - priveAmount;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -627,14 +784,21 @@ final pengeluaranList = expenses.map((e) {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFFDC2626)),
-              SizedBox(width: 8),
-              Text(
-                'Pengeluaran per Kategori',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+              const Icon(Icons.pie_chart_outline, size: 18, color: Color(0xFFDC2626)),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Pengeluaran per Kategori',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
+                ),
               ),
+              if (priveAmount > 0)
+                Text(
+                  'Beban Toko: ${_rupiah.format(operasional)}',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFDC2626)),
+                ),
             ],
           ),
           const SizedBox(height: 12),
@@ -724,11 +888,13 @@ final pengeluaranList = expenses.map((e) {
           value,
           style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
         ),
-        const SizedBox(width: 3),
-        Text(
-          '($count)',
-          style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
-        ),
+        if (count.isNotEmpty) ...[
+          const SizedBox(width: 3),
+          Text(
+            '($count)',
+            style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+          ),
+        ],
       ],
     );
   }
@@ -747,9 +913,9 @@ final pengeluaranList = expenses.map((e) {
         badgeTextColor: const Color(0xFF059669),
       ),
       _BentoCard(
-        title: 'Pengeluaran Kasir',
+        title: 'Beban Operasional',
         value: '-${_rupiah.format(_pengeluaran)}',
-        subtitle: '${_pengeluaranList.length} biaya dicatat',
+        subtitle: '${_pengeluaranList.length} biaya dicatat${_prive > 0 ? '\n+ Prive ${_rupiah.format(_prive)}' : ''}',
         icon: Icons.shopping_bag_outlined,
         badgeLabel: 'KAS KELUAR',
         badgeColor: const Color(0xFFFEF2F2),
@@ -1437,4 +1603,52 @@ class _CashierAcc {
   double pengeluaran = 0;
 
   _CashierAcc({required this.name, required this.uid});
+}
+
+// Helper row untuk section Rekonsiliasi Laci
+class _RLRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool isBold;
+  final bool isItalic;
+  final Color? labelColor;
+  final Color? valueColor;
+
+  const _RLRow(
+    this.label,
+    this.value, {
+    this.isBold = false,
+    this.isItalic = false,
+    this.labelColor,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: labelColor ?? const Color(0xFF64748B),
+              fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: isBold ? 13 : 12,
+              fontWeight: isBold ? FontWeight.w700 : FontWeight.w600,
+              color: valueColor ?? const Color(0xFF0F172A),
+              fontStyle: isItalic ? FontStyle.italic : FontStyle.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

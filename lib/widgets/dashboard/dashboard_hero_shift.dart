@@ -38,6 +38,8 @@ class DashboardHeroShift extends StatelessWidget {
     final bersih = stats?.bersih ?? 0.0;
     final openerName = opener?.fullName ?? 'Petugas';
     final omzet = stats?.omzet ?? 0.0;
+    final expenses = stats?.expenses ?? 0.0;
+    final cashInDrawer = totalCash - expenses;
 
     final cashRatio = omzet > 0 ? (totalCash / omzet).clamp(0.0, 1.0) : 0.0;
     final qrisRatio = omzet > 0 ? (totalQris / omzet).clamp(0.0, 1.0) : 0.0;
@@ -209,7 +211,7 @@ class DashboardHeroShift extends StatelessWidget {
                       _buildPaymentBadge(
                         dotColor: const Color(0xFF059669),
                         label: 'Tunai di Laci:',
-                        value: _rupiah.format(totalCash),
+                        value: _rupiah.format(cashInDrawer),
                         count: '$cashOrderCount trx',
                       ),
                       _buildPaymentBadge(
@@ -218,6 +220,13 @@ class DashboardHeroShift extends StatelessWidget {
                         value: _rupiah.format(totalQris),
                         count: '$qrisOrderCount trx',
                       ),
+                      if (expenses > 0)
+                        _buildPaymentBadge(
+                          dotColor: const Color(0xFFDC2626),
+                          label: 'Kas Keluar:',
+                          value: '-${_rupiah.format(expenses)}',
+                          count: '',
+                        ),
                     ],
                   ),
                 ],
@@ -278,8 +287,8 @@ class DashboardHeroShift extends StatelessWidget {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: onAddExpense,
-                          icon: const Icon(Icons.add, size: 15),
-                          label: const Text('Catat Biaya', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          icon: const Icon(Icons.payments_outlined, size: 15),
+                          label: const Text('Kas Keluar', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         ),
                       ),
                     ),
@@ -351,8 +360,8 @@ class DashboardHeroShift extends StatelessWidget {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: onAddExpense,
-                          icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Catat Biaya', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                          icon: const Icon(Icons.payments_outlined, size: 16),
+                          label: const Text('Kas Keluar', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                         ),
                       ),
                     ),
