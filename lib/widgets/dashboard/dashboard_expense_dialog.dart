@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../models/pos_models.dart';
 
-/// Preset cepat pengeluaran warung: kata kunci + nominal default (editable).
+/// Preset cepat pengeluaran warung: kata kunci + nominal default + kategori default.
 class _ExpensePreset {
   final String label;
   final String note;
   final double amount;
-  const _ExpensePreset(this.label, this.note, this.amount);
+  final String category;
+  const _ExpensePreset(this.label, this.note, this.amount, [this.category = 'Operasional']);
 }
 
 class DashboardExpenseDialog extends StatefulWidget {
@@ -38,11 +39,20 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
   bool _isSubmitting = false;
   bool _isDeleting = false;
 
+  static const Color _ink = Color(0xFF0F172A);
+  static const Color _muted = Color(0xFF64748B);
+  static const Color _border = Color(0xFFE2E8F0);
+  static const Color _panel = Color(0xFFF8FAFC);
+  static const Color _danger = Color(0xFFDC2626);
+
   static const List<_ExpensePreset> _presets = [
-    _ExpensePreset('Beli Es', 'Beli es batu', 5000),
-    _ExpensePreset('Gas', 'Isi gas LPG', 22000),
-    _ExpensePreset('Parkir', 'Parkir', 2000),
-    _ExpensePreset('Plastik', 'Beli plastik', 3000),
+    _ExpensePreset('Beli Es', 'Beli es batu', 5000, 'Operasional'),
+    _ExpensePreset('Gas LPG', 'Isi gas LPG', 22000, 'Operasional'),
+    _ExpensePreset('Plastik', 'Beli plastik & kresek', 5000, 'Operasional'),
+    _ExpensePreset('Restok Bahan', 'Belanja bahan / stok toko', 50000, 'Bahan Baku'),
+    _ExpensePreset('Ambil Pribadi', 'Tarik uang pribadi (Prive)', 50000, 'Pribadi'),
+    _ExpensePreset('Uang Makan', 'Uang makan / jatah kasir', 15000, 'Pribadi'),
+    _ExpensePreset('Parkir', 'Parkir', 2000, 'Transport'),
   ];
 
   bool get _isEditMode => widget.onDelete != null;
@@ -58,6 +68,7 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
     setState(() {
       _noteCtrl.text = preset.note;
       _amountCtrl.text = preset.amount.toStringAsFixed(0);
+      _category = preset.category;
     });
   }
 
@@ -86,7 +97,7 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal menyimpan pengeluaran: $e'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: _danger,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -101,7 +112,7 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: Color(0xFFE2E8F0)),
+          side: const BorderSide(color: _border),
         ),
         title: const Text('Hapus Pengeluaran?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         content: Text('"${_noteCtrl.text.trim()}" (${_amountCtrl.text}) akan dihapus dan tidak ikut dalam laporan shift.'),
@@ -109,7 +120,7 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFDC2626),
+              backgroundColor: _danger,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -132,7 +143,7 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal menghapus pengeluaran: $e'),
-            backgroundColor: const Color(0xFFDC2626),
+            backgroundColor: _danger,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -140,157 +151,240 @@ class _DashboardExpenseDialogState extends State<DashboardExpenseDialog> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      title: Row(
-        children: [
-          Icon(_isEditMode ? Icons.edit_outlined : Icons.arrow_downward, size: 20, color: const Color(0xFFDC2626)),
-          const SizedBox(width: 8),
-          Text(
-            _isEditMode ? 'Ubah Pengeluaran' : 'Catat Biaya Operasional',
-            style: const TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
-              letterSpacing: -0.3,
-            ),
-          ),
-        ],
-      ),
-      content: SingleChildScrollView(
+  InputDecoration _fieldDecoration({required String label, String? hint, String? prefixText}) {
+    OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: color, width: width),
+        );
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixText: prefixText,
+      filled: true,
+      fillColor: Colors.white,
+      labelStyle: const TextStyle(color: _muted, fontSize: 13),
+      hintStyle: const TextStyle(color: Color(0xFFCBD5E1), fontSize: 13),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: border(_border, 1),
+      enabledBorder: border(_border, 1),
+      focusedBorder: border(_ink, 1.4),
+    );
+  }
+
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.6, color: _muted),
+      );
+
+  Widget _categoryCard(String cat) {
+    final selected = _category == cat;
+    final tint = ExpenseCategories.textColor(cat);
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => setState(() => _category = cat),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        width: 84,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+        decoration: BoxDecoration(
+          color: selected ? tint.withAlpha(18) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? tint : _border, width: selected ? 1.4 : 1),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Icon(ExpenseCategories.icons[cat], size: 20, color: selected ? tint : _muted),
+            const SizedBox(height: 6),
             Text(
-              _isEditMode
-                  ? 'Perubahan akan langsung diterapkan pada laporan shift ini.'
-                  : 'Biaya ini akan langsung memotong kas masuk bersih shift yang sedang berjalan.',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-            if (!_isEditMode) ...[
-              const SizedBox(height: 12),
-              const Text(
-                'CEPAT',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _presets.map((p) {
-                  return ActionChip(
-                    avatar: const Icon(Icons.bolt, size: 14, color: Color(0xFF0F172A)),
-                    label: Text(p.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
-                    backgroundColor: const Color(0xFFF8FAFC),
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () => _applyPreset(p),
-                  );
-                }).toList(),
-              ),
-            ],
-            const SizedBox(height: 14),
-            const Text(
-              'KATEGORI PENGELUARAN',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Color(0xFF64748B)),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: ExpenseCategories.all.map((cat) {
-                final selected = _category == cat;
-                return ChoiceChip(
-                  label: Text(
-                    cat,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                      color: selected ? Colors.white : ExpenseCategories.textColor(cat),
-                    ),
-                  ),
-                  selected: selected,
-                  onSelected: (_) => setState(() => _category = cat),
-                  selectedColor: ExpenseCategories.textColor(cat),
-                  backgroundColor: ExpenseCategories.background(cat),
-                  avatar: Icon(
-                    ExpenseCategories.icons[cat],
-                    size: 15,
-                    color: selected ? Colors.white : ExpenseCategories.textColor(cat),
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    side: BorderSide(
-                      color: selected ? ExpenseCategories.textColor(cat) : ExpenseCategories.textColor(cat).withAlpha(40),
-                    ),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  visualDensity: VisualDensity.compact,
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: _noteCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Keterangan Biaya',
-                hintText: 'Contoh: Beli Es Batu, Gas LPG, Plastik',
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _amountCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Nominal Biaya (Rp)',
-                hintText: '0',
-                prefixText: 'Rp ',
+              cat,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                color: selected ? tint : _ink,
+                height: 1.15,
               ),
             ),
           ],
         ),
       ),
-      actions: [
-        if (_isEditMode)
-          TextButton.icon(
-            onPressed: _isSubmitting || _isDeleting ? null : _delete,
-            style: TextButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
-            icon: _isDeleting
-                ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFDC2626)))
-                : const Icon(Icons.delete_outline, size: 18),
-            label: const Text('Hapus'),
-          ),
-        const Spacer(),
-        TextButton(
-          onPressed: _isSubmitting || _isDeleting ? null : () => Navigator.pop(context, false),
-          child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+    );
+  }
+
+  Widget _presetPill(_ExpensePreset p) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => _applyPreset(p),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: _panel,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _border),
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFDC2626),
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          ),
-          onPressed: _isSubmitting || _isDeleting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : Text(_isEditMode ? 'Simpan Perubahan' : 'Simpan Pengeluaran'),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.bolt, size: 13, color: Color(0xFF94A3B8)),
+            const SizedBox(width: 5),
+            Text(p.label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _danger.withAlpha(18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      _isEditMode ? Icons.edit_outlined : Icons.arrow_downward,
+                      size: 18,
+                      color: _danger,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _isEditMode ? 'Ubah Pengeluaran' : 'Catat Kas Keluar',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _ink, letterSpacing: -0.2),
+                    ),
+                  ),
+                  if (_isEditMode)
+                    IconButton(
+                      onPressed: _isSubmitting || _isDeleting ? null : _delete,
+                      icon: _isDeleting
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: _danger))
+                          : const Icon(Icons.delete_outline, size: 19, color: _danger),
+                      tooltip: 'Hapus',
+                      splashRadius: 18,
+                    ),
+                  IconButton(
+                    onPressed: _isSubmitting || _isDeleting ? null : () => Navigator.pop(context, false),
+                    icon: const Icon(Icons.close, size: 18, color: _muted),
+                    splashRadius: 18,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _isEditMode
+                    ? 'Perubahan langsung diterapkan ke laporan shift ini.'
+                    : 'Langsung motong kas fisik di laci — restok, operasional, atau pribadi.',
+                style: const TextStyle(fontSize: 12.5, color: _muted, height: 1.35),
+              ),
+              const SizedBox(height: 16),
+
+              // Kategori — kartu, bukan chip kecil
+              _sectionLabel('KATEGORI'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ExpenseCategories.all.map(_categoryCard).toList(),
+              ),
+
+              if (!_isEditMode) ...[
+                const SizedBox(height: 16),
+                _sectionLabel('ISI CEPAT'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _presets.map(_presetPill).toList(),
+                ),
+              ],
+
+              const SizedBox(height: 18),
+              TextField(
+                controller: _noteCtrl,
+                style: const TextStyle(fontSize: 14),
+                decoration: _fieldDecoration(
+                  label: 'Keterangan Pengeluaran',
+                  hint: 'Contoh: Beli Es Batu, Belanja Beras/Stok',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _amountCtrl,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                decoration: _fieldDecoration(
+                  label: 'Nominal Kas Keluar',
+                  hint: '0',
+                  prefixText: 'Rp ',
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Footer
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _isSubmitting || _isDeleting ? null : () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _muted,
+                        side: const BorderSide(color: _border),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _danger,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: _isSubmitting || _isDeleting ? null : _submit,
+                      child: _isSubmitting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : Text(
+                              _isEditMode ? 'Simpan Perubahan' : 'Simpan Pengeluaran',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
