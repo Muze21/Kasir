@@ -9,6 +9,7 @@ class PosTopBar extends StatefulWidget implements PreferredSizeWidget {
   final VoidCallback onOpenOrderHistory;
   final VoidCallback onViewReport;
   final VoidCallback onCloseShift;
+  final VoidCallback? onAddExpense;
 
   const PosTopBar({
     super.key,
@@ -17,6 +18,7 @@ class PosTopBar extends StatefulWidget implements PreferredSizeWidget {
     required this.onOpenOrderHistory,
     required this.onViewReport,
     required this.onCloseShift,
+    this.onAddExpense,
   });
 
   @override
@@ -130,6 +132,14 @@ class _PosTopBarState extends State<PosTopBar> {
           tooltip: 'Riwayat Transaksi',
           onPressed: widget.onOpenOrderHistory,
         ),
+
+        // Tombol Kas Keluar / Biaya Operasional
+        if (widget.onAddExpense != null)
+          IconButton(
+            icon: const Icon(Icons.payments_outlined, size: 20, color: Color(0xFF0F172A)),
+            tooltip: 'Kas Keluar / Biaya',
+            onPressed: widget.onAddExpense,
+          ),
 
         // Tombol Laporan
         if (!isMobile) ...[

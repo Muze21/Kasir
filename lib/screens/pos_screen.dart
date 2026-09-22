@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/pos_models.dart';
 import '../services/database_service.dart';
+import '../widgets/dashboard/dashboard_expense_dialog.dart';
 import '../widgets/pos/pos_cart_pane.dart';
 import '../widgets/pos/pos_catalog_pane.dart';
 import '../widgets/pos/pos_order_history_dialog.dart';
@@ -433,6 +434,31 @@ class _PosScreenState extends State<PosScreen> {
     );
   }
 
+  void _openAddExpense() {
+    showDialog(
+      context: context,
+      builder: (_) => DashboardExpenseDialog(
+        onSubmit: (note, amount, category) async {
+          await _db.createExpense(
+            shiftId: widget.shift.id,
+            amount: amount,
+            note: note,
+            category: category,
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Kas keluar berhasil dicatat.'),
+                backgroundColor: Color(0xFF059669),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -440,6 +466,7 @@ class _PosScreenState extends State<PosScreen> {
       appBar: PosTopBar(
         shift: widget.shift,
         onOpenOrderHistory: _openOrderHistory,
+        onAddExpense: _openAddExpense,
         onViewReport: _viewReport,
         onCloseShift: _closeShift,
       ),
