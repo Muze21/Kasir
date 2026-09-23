@@ -46,3 +46,7 @@ app.*.map.json
 
 # Supabase secret config
 lib/config/supabase_config.dart
+
+# Claude
+.claude/
+.agents/
