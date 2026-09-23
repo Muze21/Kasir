@@ -30,31 +30,8 @@ class PosCatalogPane extends StatefulWidget {
 }
 
 class _PosCatalogPaneState extends State<PosCatalogPane> {
-  String _selectedCategory = 'Semua';
   bool _isCustomItemExpanded = false;
   static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
-
-  List<String> get _categories {
-    final set = <String>{'Semua'};
-    for (final item in widget.presetItems) {
-      final cat = item['category']?.toString();
-      if (cat != null && cat.isNotEmpty) {
-        // Format Title Case untuk kategori
-        set.add(cat[0].toUpperCase() + cat.substring(1).toLowerCase());
-      }
-    }
-    return set.toList();
-  }
-
-  List<Map<String, dynamic>> get _filteredPresets {
-    if (_selectedCategory == 'Semua') {
-      return widget.presetItems;
-    }
-    return widget.presetItems.where((item) {
-      final cat = item['category']?.toString().toLowerCase() ?? '';
-      return cat == _selectedCategory.toLowerCase();
-    }).toList();
-  }
 
   void _handleAddCustomItem() {
     final name = widget.customNameCtrl.text.trim();
@@ -157,51 +134,16 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                 ],
                 const Spacer(),
                 Text(
-                  '${_filteredPresets.length} item',
+                  '${widget.presetItems.length} item',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                 ),
               ],
             ),
 
-            const SizedBox(height: 10),
-
-            // Kategori Chips (Horizontal Scrollable agar tidak overflow di HP)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: _categories.map((cat) {
-                  final isSelected = _selectedCategory == cat;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 6),
-                    child: ChoiceChip(
-                      label: Text(cat),
-                      selected: isSelected,
-                      onSelected: (_) => setState(() => _selectedCategory = cat),
-                      selectedColor: const Color(0xFF0F172A),
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? Colors.white : const Color(0xFF64748B),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(
-                          color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-
             const SizedBox(height: 12),
 
             // Grid Preset Menu
-            if (_filteredPresets.isEmpty)
+            if (widget.presetItems.isEmpty)
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                 decoration: BoxDecoration(
@@ -239,7 +181,7 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: _filteredPresets.length,
+                itemCount: widget.presetItems.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: isNarrow ? 2 : 3,
                   mainAxisSpacing: 8,
@@ -247,7 +189,7 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                   childAspectRatio: isNarrow ? 1.6 : 1.7,
                 ),
                 itemBuilder: (context, index) {
-                  final item = _filteredPresets[index];
+                  final item = widget.presetItems[index];
                   final name = item['name'] as String;
                   final price = (item['price'] as num).toDouble();
                   final inCartQty = widget.cartItemCounts[name] ?? 0;

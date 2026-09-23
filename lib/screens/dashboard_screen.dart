@@ -12,6 +12,7 @@ import '../widgets/dashboard/dashboard_hero_shift.dart';
 import '../widgets/dashboard/dashboard_stats_grid.dart';
 import 'pos_screen.dart';
 import 'report_screen.dart';
+import 'restock_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -31,6 +32,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Expense> _recentExpenses = [];
   bool _isLoading = true;
   Timer? _autoRefreshTimer;
+
+  // State lokal untuk menampung Belanja Pagi sebelum toko buka
+  final List<Map<String, dynamic>> _morningExpenses = [];
 
   static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
@@ -154,16 +158,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _openShift() async {
+    // Hitung total belanja pagi yang memotong laci
+    final totalBelanjaPagi = _morningExpenses.fold(0.0, (sum, item) => sum + (item['amount'] as double));
+
     // Dialog input Modal Awal sebelum buka toko
     final result = await showDialog<double>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => _OpenShiftDialog(),
+      builder: (ctx) => _OpenShiftDialog(
+        totalBelanjaPagi: totalBelanjaPagi,
+        rupiah: _rupiah,
+      ),
     );
     if (result == null || !mounted) return; // user tekan Batal
 
     try {
-      final shift = await _db.openShift(initialCash: result);
+      final shift = await _db.openShift(initialCash: result, morningExpenses: _morningExpenses);
+      _morningExpenses.clear(); // Bersihkan memori
+
       if (!mounted) return;
       Navigator.push(context, MaterialPageRoute(builder: (_) => PosScreen(shift: shift)))
           .then((_) => _loadData());
@@ -347,6 +359,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Future<void> _openRestockScreen() async {
+    final result = await Navigator.push<List<Map<String, dynamic>>>(
+      context,
+      MaterialPageRoute(builder: (_) => const RestockScreen()),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      setState(() {
+        // Simpan per item agar detail; total sudah termasuk qty.
+        for (var item in result) {
+          final price = (item['price'] as num?)?.toDouble() ?? 0;
+          final qty = (item['qty'] as int?) ?? 1;
+          _morningExpenses.add({
+            'note': 'Restok Pagi: ${item['name']}',
+            'amount': price * qty,
+          });
+        }
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Daftar belanja pagi berhasil dicatat sementara.'),
+          backgroundColor: Color(0xFF059669),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   void _viewReport(String shiftId) {
     Navigator.push(
       context,
@@ -416,7 +458,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         DashboardClosedShift(
                           profile: _profile,
                           lastClosedShift: _lastClosedShift,
+                          morningExpenses: _morningExpenses,
                           onOpenShift: _openShift,
+                          onAddMorningExpense: _openRestockScreen,
                           onViewReport: _viewReport,
                         ),
                       ],
@@ -431,13 +475,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
 // ─── Dialog: Buka Toko — Input Modal Awal ────────────────────────────────────
 class _OpenShiftDialog extends StatefulWidget {
+  final double totalBelanjaPagi;
+  final NumberFormat rupiah;
+
+  const _OpenShiftDialog({
+    required this.totalBelanjaPagi,
+    required this.rupiah,
+  });
+
   @override
   State<_OpenShiftDialog> createState() => _OpenShiftDialogState();
 }
 
 class _OpenShiftDialogState extends State<_OpenShiftDialog> {
   final _ctrl = TextEditingController();
-  static final _rupiah = NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
 
   @override
   void dispose() {
@@ -471,12 +522,14 @@ class _OpenShiftDialogState extends State<_OpenShiftDialog> {
       ),
       content: StatefulBuilder(
         builder: (ctx, setSt) {
+          final sisaLaciFisik = _parsed - widget.totalBelanjaPagi;
+
           return Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Masukkan jumlah uang kembalian (modal awal) yang diletakkan di laci kasir sebelum toko dibuka.',
+                'Masukkan modal awal uang kembalian (SEBELUM dipotong belanja pagi, jika ada).',
                 style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
               ),
               const SizedBox(height: 16),
@@ -485,11 +538,15 @@ class _OpenShiftDialogState extends State<_OpenShiftDialog> {
                 autofocus: true,
                 keyboardType: TextInputType.number,
                 onChanged: (_) => setSt(() {}),
-                decoration: const InputDecoration(
-                  labelText: 'Modal Awal di Laci',
+                decoration: InputDecoration(
+                  labelText: 'Total Modal Disiapkan',
                   hintText: '0',
                   prefixText: 'Rp ',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
+                  helperText: widget.totalBelanjaPagi > 0
+                      ? 'Fisik Laci: ${widget.rupiah.format(sisaLaciFisik)}'
+                      : null,
+                  helperStyle: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                 ),
               ),
               const SizedBox(height: 10),
@@ -497,9 +554,9 @@ class _OpenShiftDialogState extends State<_OpenShiftDialog> {
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
-                children: [50000, 100000, 150000, 200000].map((val) {
+                children: [50000, 100000, 150000, 200000, 300000].map((val) {
                   return ActionChip(
-                    label: Text(_rupiah.format(val), style: const TextStyle(fontSize: 11)),
+                    label: Text(widget.rupiah.format(val), style: const TextStyle(fontSize: 11)),
                     backgroundColor: const Color(0xFFF0FDF4),
                     side: const BorderSide(color: Color(0xFF86EFAC)),
                     onPressed: () {

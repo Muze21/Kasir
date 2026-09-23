@@ -3,18 +3,18 @@ import 'package:intl/intl.dart';
 import '../models/pos_models.dart';
 import '../services/database_service.dart';
 
-class ManageMenuScreen extends StatefulWidget {
-  const ManageMenuScreen({super.key});
+class ManageMaterialScreen extends StatefulWidget {
+  const ManageMaterialScreen({super.key});
 
   @override
-  State<ManageMenuScreen> createState() => _ManageMenuScreenState();
+  State<ManageMaterialScreen> createState() => _ManageMaterialScreenState();
 }
 
-class _ManageMenuScreenState extends State<ManageMenuScreen> {
+class _ManageMaterialScreenState extends State<ManageMaterialScreen> {
   final _db = DatabaseService();
   final _searchCtrl = TextEditingController();
 
-  List<Product> _allProducts = [];
+  List<MaterialItem> _allMaterials = [];
   bool _isLoading = true;
   String _searchQuery = '';
 
@@ -23,7 +23,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _loadMaterials();
     _searchCtrl.addListener(() {
       setState(() => _searchQuery = _searchCtrl.text.trim().toLowerCase());
     });
@@ -35,13 +35,13 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadMaterials() async {
     setState(() => _isLoading = true);
     try {
-      final products = await _db.getProducts();
+      final materials = await _db.getMaterials();
       if (!mounted) return;
       setState(() {
-        _allProducts = products;
+        _allMaterials = materials;
         _isLoading = false;
       });
     } catch (_) {
@@ -50,17 +50,17 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     }
   }
 
-  List<Product> get _filteredProducts {
-    return _allProducts.where((p) {
-      return _searchQuery.isEmpty || p.name.toLowerCase().contains(_searchQuery);
+  List<MaterialItem> get _filteredMaterials {
+    return _allMaterials.where((m) {
+      return _searchQuery.isEmpty || m.name.toLowerCase().contains(_searchQuery);
     }).toList();
   }
 
-  void _showAddEditProductDialog({Product? product}) {
-    final isEditing = product != null;
-    final nameCtrl = TextEditingController(text: product?.name ?? '');
+  void _showAddEditMaterialDialog({MaterialItem? material}) {
+    final isEditing = material != null;
+    final nameCtrl = TextEditingController(text: material?.name ?? '');
     final priceCtrl = TextEditingController(
-      text: product != null ? product.price.toStringAsFixed(0) : '',
+      text: material != null ? material.defaultPrice.toStringAsFixed(0) : '',
     );
 
     showDialog(
@@ -77,7 +77,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 24),
           actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
           title: Text(
-            isEditing ? 'Edit Menu Toko' : 'Tambah Menu Baru',
+            isEditing ? 'Edit Bahan Mentah' : 'Tambah Bahan Mentah',
             style: const TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
@@ -95,8 +95,8 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   TextField(
                     controller: nameCtrl,
                     decoration: const InputDecoration(
-                      labelText: 'Nama Menu / Barang',
-                      hintText: 'Contoh: Es Teh Manis',
+                      labelText: 'Nama Bahan',
+                      hintText: 'Contoh: Beras 5Kg',
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -104,9 +104,11 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                     controller: priceCtrl,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Harga Jual (Rp)',
-                      hintText: '5000',
+                      labelText: 'Harga Standar (Rp)',
+                      hintText: '70000',
                       prefixText: 'Rp ',
+                      helperText: 'Harga ini menjadi panduan saat kasir menginput belanja pagi.',
+                      helperMaxLines: 2,
                     ),
                   ),
                 ],
@@ -144,7 +146,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
 
                 if (name.isEmpty || price == null || price <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Lengkapi nama dan harga menu dengan benar.')),
+                    const SnackBar(content: Text('Lengkapi nama dan harga bahan dengan benar.')),
                   );
                   return;
                 }
@@ -155,23 +157,23 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
 
                 try {
                   if (isEditing) {
-                    await _db.updateProduct(
-                      id: product.id,
+                    await _db.updateMaterial(
+                      id: material.id,
                       name: name,
-                      price: price,
+                      defaultPrice: price,
                     );
                   } else {
-                    await _db.addProduct(
+                    await _db.addMaterial(
                       name: name,
-                      price: price,
+                      defaultPrice: price,
                     );
                   }
 
-                  _loadProducts();
+                  _loadMaterials();
                   if (mounted) {
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text(isEditing ? 'Menu berhasil diperbarui' : 'Menu baru berhasil ditambahkan'),
+                        content: Text(isEditing ? 'Bahan berhasil diperbarui' : 'Bahan baru berhasil ditambahkan'),
                         backgroundColor: const Color(0xFF059669),
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -182,7 +184,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                     setState(() => _isLoading = false);
                     messenger.showSnackBar(
                       SnackBar(
-                        content: Text('Gagal menyimpan menu: $e'),
+                        content: Text('Gagal menyimpan bahan: $e'),
                         backgroundColor: const Color(0xFFDC2626),
                         behavior: SnackBarBehavior.floating,
                       ),
@@ -190,7 +192,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   }
                 }
               },
-              child: Text(isEditing ? 'Simpan Perubahan' : 'Tambah Menu'),
+              child: Text(isEditing ? 'Simpan Perubahan' : 'Tambah Bahan'),
             ),
           ],
         ),
@@ -198,7 +200,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     );
   }
 
-  Future<void> _confirmDeleteProduct(Product product) async {
+  Future<void> _confirmDeleteMaterial(MaterialItem material) async {
     final messenger = ScaffoldMessenger.of(context);
     final confirm = await showDialog<bool>(
       context: context,
@@ -208,8 +210,8 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
-        title: const Text('Hapus Menu?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        content: Text('Menu "${product.name}" akan dihapus dari katalog kasir toko.'),
+        title: const Text('Hapus Bahan?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Text('Bahan "${material.name}" akan dihapus dari daftar belanja cepat.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           ElevatedButton(
@@ -228,12 +230,12 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await _db.deleteProduct(product.id);
-        _loadProducts();
+        await _db.deleteMaterial(material.id);
+        _loadMaterials();
         if (mounted) {
           messenger.showSnackBar(
             const SnackBar(
-              content: Text('Menu berhasil dihapus'),
+              content: Text('Bahan berhasil dihapus'),
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -243,7 +245,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           setState(() => _isLoading = false);
           messenger.showSnackBar(
             SnackBar(
-              content: Text('Gagal menghapus menu: $e'),
+              content: Text('Gagal menghapus bahan: $e'),
               backgroundColor: const Color(0xFFDC2626),
               behavior: SnackBarBehavior.floating,
             ),
@@ -255,7 +257,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredProducts;
+    final filtered = _filteredMaterials;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -268,7 +270,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           onPressed: () => Navigator.pop(context, true), // Return true to indicate reload needed
         ),
         title: const Text(
-          'Kelola Menu Toko',
+          'Kelola Bahan Mentah',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w800,
@@ -279,8 +281,8 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline, size: 22, color: Color(0xFF0F172A)),
-            tooltip: 'Tambah Menu Baru',
-            onPressed: () => _showAddEditProductDialog(),
+            tooltip: 'Tambah Bahan Baru',
+            onPressed: () => _showAddEditMaterialDialog(),
           ),
           const SizedBox(width: 8),
         ],
@@ -294,56 +296,49 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Search & Filter Header
                 Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    children: [
-                      // Search Field
-                      TextField(
-                        controller: _searchCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Cari menu toko...',
-                          prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                        ),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      hintText: 'Cari bahan mentah...',
+                      prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF64748B)),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
                       ),
-                    ],
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                    ),
                   ),
                 ),
 
                 const Divider(height: 1, color: Color(0xFFE2E8F0)),
 
-                // Total Menu Count Bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
                       Text(
-                        'Total Menu (${filtered.length})',
+                        'Total Bahan (${filtered.length})',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF64748B)),
                       ),
                       const Spacer(),
                       InkWell(
-                        onTap: () => _showAddEditProductDialog(),
+                        onTap: () => _showAddEditMaterialDialog(),
                         child: const Row(
                           children: [
                             Icon(Icons.add, size: 14, color: Color(0xFF059669)),
                             SizedBox(width: 4),
                             Text(
-                              '+ Tambah Menu',
+                              '+ Tambah Bahan',
                               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF059669)),
                             ),
                           ],
@@ -353,7 +348,6 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                   ),
                 ),
 
-                // Daftar Item Menu
                 Expanded(
                   child: filtered.isEmpty
                       ? _buildEmptyState()
@@ -362,7 +356,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                           itemCount: filtered.length,
                           separatorBuilder: (context, index) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
-                            final p = filtered[index];
+                            final m = filtered[index];
 
                             return Container(
                               padding: const EdgeInsets.all(12),
@@ -373,7 +367,6 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  // Icon Kategori
                                   Container(
                                     width: 38,
                                     height: 38,
@@ -382,21 +375,19 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                                       borderRadius: BorderRadius.circular(10),
                                       border: Border.all(color: const Color(0xFFE2E8F0)),
                                     ),
-                                    child: Icon(
-                                      Icons.restaurant_outlined,
+                                    child: const Icon(
+                                      Icons.inventory_2_outlined,
                                       size: 18,
-                                      color: const Color(0xFF0F172A),
+                                      color: Color(0xFF0F172A),
                                     ),
                                   ),
                                   const SizedBox(width: 12),
-
-                                  // Nama & Kategori
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          p.name,
+                                          m.name,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
                                           style: const TextStyle(
@@ -407,7 +398,7 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          _rupiah.format(p.price),
+                                          _rupiah.format(m.defaultPrice),
                                           style: const TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w800,
@@ -417,17 +408,15 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                                       ],
                                     ),
                                   ),
-
-                                  // Action Buttons
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF64748B)),
-                                    tooltip: 'Edit Menu',
-                                    onPressed: () => _showAddEditProductDialog(product: p),
+                                    tooltip: 'Edit Bahan',
+                                    onPressed: () => _showAddEditMaterialDialog(material: m),
                                   ),
                                   IconButton(
                                     icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
-                                    tooltip: 'Hapus Menu',
-                                    onPressed: () => _confirmDeleteProduct(p),
+                                    tooltip: 'Hapus Bahan',
+                                    onPressed: () => _confirmDeleteMaterial(m),
                                   ),
                                 ],
                               ),
@@ -454,16 +443,16 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 color: const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.restaurant_menu, size: 24, color: Color(0xFF94A3B8)),
+              child: const Icon(Icons.inventory_2_outlined, size: 24, color: Color(0xFF94A3B8)),
             ),
             const SizedBox(height: 12),
             const Text(
-              'Belum Ada Menu',
+              'Belum Ada Bahan',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 4),
             const Text(
-              'Tambahkan menu makanan atau minuman pertama toko Anda.',
+              'Tambahkan bahan mentah agar cepat diinput saat belanja pagi.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
             ),
@@ -474,9 +463,9 @@ class _ManageMenuScreenState extends State<ManageMenuScreen> {
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () => _showAddEditProductDialog(),
+              onPressed: () => _showAddEditMaterialDialog(),
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('Tambah Menu Sekarang'),
+              label: const Text('Tambah Bahan Sekarang'),
             ),
           ],
         ),

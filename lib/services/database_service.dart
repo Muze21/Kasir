@@ -35,13 +35,29 @@ class DatabaseService {
   }
 
   // BUKA TOKO (OPEN SHIFT)
-  Future<Shift> openShift({double initialCash = 0}) async {
+  Future<Shift> openShift({double initialCash = 0, List<Map<String, dynamic>> morningExpenses = const []}) async {
     final res = await _supabase.from('shifts').insert({
       'opened_by': currentUserId,
       'status': 'open',
       'initial_cash': initialCash,
     }).select().single();
-    return Shift.fromJson(res);
+
+    final shift = Shift.fromJson(res);
+
+    // Jika ada catatan belanja pagi, langsung masukkan ke expenses shift ini
+    if (morningExpenses.isNotEmpty) {
+      final expensesToInsert = morningExpenses.map((e) => {
+        'shift_id': shift.id,
+        'note': e['note'],
+        'amount': e['amount'],
+        'category': 'Bahan Baku', // Otomatis masuk Bahan Baku
+        'user_id': currentUserId,
+      }).toList();
+
+      await _supabase.from('expenses').insert(expensesToInsert);
+    }
+
+    return shift;
   }
 
   // TUTUP TOKO (CLOSE SHIFT)
@@ -498,9 +514,9 @@ class DatabaseService {
   // MANAJEMEN PRODUK / MENU TOKO (CRUD)
   // ───────────────────────────────────────────────────────────────────────────
   static final List<Product> _fallbackProducts = [
-    Product(id: 'prod-1', name: 'soto nasi', price: 12000.0, category: 'Makanan'),
-    Product(id: 'prod-2', name: 'kerupuk gede', price: 5000.0, category: 'Makanan'),
-    Product(id: 'prod-3', name: 'kerupuk kecil', price: 2000.0, category: 'Makanan'),
+    Product(id: 'prod-1', name: 'Soto Nasi', price: 15000.0),
+    Product(id: 'prod-2', name: 'Soto Pisah', price: 17000.0),
+    Product(id: 'prod-3', name: 'Kerupuk Putih', price: 2000.0),
   ];
 
   Future<List<Product>> getProducts() async {
@@ -524,7 +540,6 @@ class DatabaseService {
   Future<Product> addProduct({
     required String name,
     required double price,
-    required String category,
   }) async {
     if (name.trim().isEmpty) {
       throw ArgumentError('Nama menu tidak boleh kosong.');
@@ -537,7 +552,6 @@ class DatabaseService {
       final res = await _supabase.from('products').insert({
         'name': name.trim(),
         'price': price,
-        'category': category.trim(),
       }).select().single();
       final created = Product.fromJson(res);
       _fallbackProducts.removeWhere((p) => p.id == created.id);
@@ -552,7 +566,6 @@ class DatabaseService {
     required String id,
     required String name,
     required double price,
-    required String category,
   }) async {
     if (name.trim().isEmpty) {
       throw ArgumentError('Nama menu tidak boleh kosong.');
@@ -565,7 +578,6 @@ class DatabaseService {
       await _supabase.from('products').update({
         'name': name.trim(),
         'price': price,
-        'category': category.trim(),
       }).eq('id', id);
 
       final index = _fallbackProducts.indexWhere((p) => p.id == id);
@@ -574,7 +586,6 @@ class DatabaseService {
           id: id,
           name: name.trim(),
           price: price,
-          category: category.trim(),
         );
       }
     } catch (e) {
@@ -586,6 +597,99 @@ class DatabaseService {
     try {
       await _supabase.from('products').delete().eq('id', id);
       _fallbackProducts.removeWhere((p) => p.id == id);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // MANAJEMEN BAHAN MENTAH (MATERIALS) — Untuk Fitur Restok / Belanja Pagi
+  // ───────────────────────────────────────────────────────────────────────────
+  static final List<MaterialItem> _fallbackMaterials = [
+    MaterialItem(id: 'mat-1', name: 'Beras 5Kg', defaultPrice: 70000.0),
+    MaterialItem(id: 'mat-2', name: 'Minyak Goreng 2L', defaultPrice: 35000.0),
+    MaterialItem(id: 'mat-3', name: 'Daging Sapi 1Kg', defaultPrice: 120000.0),
+    MaterialItem(id: 'mat-4', name: 'Daging Ayam 1Kg', defaultPrice: 40000.0),
+  ];
+
+  Future<List<MaterialItem>> getMaterials() async {
+    try {
+      final res = await _supabase
+          .from('materials')
+          .select()
+          .order('name', ascending: true);
+      final list = (res as List).map((j) => MaterialItem.fromJson(j)).toList();
+      if (list.isNotEmpty) {
+        _fallbackMaterials.clear();
+        _fallbackMaterials.addAll(list);
+        return list;
+      }
+    } catch (_) {
+      // Fallback ke cache in-memory jika tabel belum dibuat di Supabase
+    }
+    return List<MaterialItem>.from(_fallbackMaterials);
+  }
+
+  Future<MaterialItem> addMaterial({
+    required String name,
+    required double defaultPrice,
+  }) async {
+    if (name.trim().isEmpty) {
+      throw ArgumentError('Nama bahan tidak boleh kosong.');
+    }
+    if (defaultPrice <= 0) {
+      throw ArgumentError('Harga bahan harus lebih besar dari 0.');
+    }
+
+    try {
+      final res = await _supabase.from('materials').insert({
+        'name': name.trim(),
+        'default_price': defaultPrice,
+      }).select().single();
+      final created = MaterialItem.fromJson(res);
+      _fallbackMaterials.removeWhere((m) => m.id == created.id);
+      _fallbackMaterials.add(created);
+      return created;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateMaterial({
+    required String id,
+    required String name,
+    required double defaultPrice,
+  }) async {
+    if (name.trim().isEmpty) {
+      throw ArgumentError('Nama bahan tidak boleh kosong.');
+    }
+    if (defaultPrice <= 0) {
+      throw ArgumentError('Harga bahan harus lebih besar dari 0.');
+    }
+
+    try {
+      await _supabase.from('materials').update({
+        'name': name.trim(),
+        'default_price': defaultPrice,
+      }).eq('id', id);
+
+      final index = _fallbackMaterials.indexWhere((m) => m.id == id);
+      if (index >= 0) {
+        _fallbackMaterials[index] = MaterialItem(
+          id: id,
+          name: name.trim(),
+          defaultPrice: defaultPrice,
+        );
+      }
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMaterial(String id) async {
+    try {
+      await _supabase.from('materials').delete().eq('id', id);
+      _fallbackMaterials.removeWhere((m) => m.id == id);
     } catch (e) {
       rethrow;
     }

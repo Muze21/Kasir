@@ -126,13 +126,11 @@ create policy "Auth access orders" on public.orders for all to authenticated usi
 create policy "Auth access order_items" on public.order_items for all to authenticated using (true) with check (true);
 create policy "Auth access expenses" on public.expenses for all to authenticated using (true) with check (true);
 
--- 10. PRODUCTS / MENU TOKO
+-- 10. PRODUCTS / MENU TOKO (Sangat Sederhana: Hanya Nama dan Harga)
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   price numeric not null check (price >= 0),
-  category text not null default 'Makanan',
-  is_available boolean default true,
   created_at timestamptz default now()
 );
 
@@ -141,17 +139,37 @@ create policy "Auth access products" on public.products
   for all to authenticated using (true) with check (true);
 
 -- Insert default sample products
-insert into public.products (name, price, category)
+insert into public.products (name, price)
 values
-  ('soto nasi', 12000, 'Makanan'),
-  ('kerupuk gede', 5000, 'Makanan'),
-  ('kerupuk kecil', 2000, 'Makanan')
+  ('Soto Nasi', 15000),
+  ('Soto Pisah', 17000),
+  ('Kerupuk Putih', 2000)
 on conflict do nothing;
 
--- 11. MIGRATION HELPER (Jalankan jika database lama belum ada kolom status & void_reason):
+-- 11. MATERIALS / BAHAN MENTAH
+create table if not exists public.materials (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  default_price numeric not null check (default_price >= 0),
+  created_at timestamptz default now()
+);
+
+alter table public.materials enable row level security;
+create policy "Auth access materials" on public.materials
+  for all to authenticated using (true) with check (true);
+
+insert into public.materials (name, default_price)
+values
+  ('Beras 5Kg', 70000),
+  ('Minyak Goreng 2L', 35000),
+  ('Daging Sapi 1Kg', 120000),
+  ('Daging Ayam 1Kg', 40000)
+on conflict do nothing;
+
+-- 12. MIGRATION HELPER (Jalankan jika database lama belum ada kolom status & void_reason):
 -- alter table public.orders add column if not exists status text check (status in ('completed', 'voided')) default 'completed';
 -- alter table public.orders add column if not exists void_reason text;
 
--- 12. MIGRATION HELPER - Modal Awal & Rekonsiliasi Laci (jalankan di database yang sudah ada):
+-- 13. MIGRATION HELPER - Modal Awal & Rekonsiliasi Laci (jalankan di database yang sudah ada):
 -- alter table public.shifts add column if not exists initial_cash numeric default 0;
 -- alter table public.shifts add column if not exists actual_cash numeric;
