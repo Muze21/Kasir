@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class PosCartPane extends StatefulWidget {
+  final bool isRestockMode;
   final List<Map<String, dynamic>> cart;
   final VoidCallback onClearCart;
   final void Function(int index, int delta) onUpdateQty;
@@ -18,6 +19,7 @@ class PosCartPane extends StatefulWidget {
 
   const PosCartPane({
     super.key,
+    this.isRestockMode = false,
     required this.cart,
     required this.onClearCart,
     required this.onUpdateQty,
@@ -76,6 +78,7 @@ class _PosCartPaneState extends State<PosCartPane> {
 
   bool get _canSubmit {
     if (widget.cart.isEmpty || widget.isSubmitting) return false;
+    if (widget.isRestockMode) return true; // Belanja pagi selalu bisa submit
     if (widget.paymentMethod == 'cash') {
       return _cashReceived >= widget.cartTotal && widget.cartTotal > 0;
     }
@@ -104,10 +107,10 @@ class _PosCartPaneState extends State<PosCartPane> {
           // Header Keranjang
           Row(
             children: [
-              const Icon(Icons.shopping_bag_outlined, size: 20, color: Color(0xFF0F172A)),
+              Icon(widget.isRestockMode ? Icons.shopping_cart_outlined : Icons.shopping_bag_outlined, size: 20, color: const Color(0xFF0F172A)),
               const SizedBox(width: 8),
               Text(
-                'Keranjang (${widget.cartItemCount} item)',
+                widget.isRestockMode ? 'Daftar Belanja (${widget.cartItemCount})' : 'Keranjang (${widget.cartItemCount} item)',
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
@@ -288,20 +291,21 @@ class _PosCartPaneState extends State<PosCartPane> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          if (!widget.isRestockMode) ...[
+            const SizedBox(height: 16),
 
-          // Metode Pembayaran Selector
-          const Text(
-            'METODE PEMBAYARAN',
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Color(0xFF64748B)),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () => widget.onPaymentMethodChanged('cash'),
-                  borderRadius: BorderRadius.circular(10),
+            // Metode Pembayaran Selector
+            const Text(
+              'METODE PEMBAYARAN',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.8, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => widget.onPaymentMethodChanged('cash'),
+                    borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     decoration: BoxDecoration(
@@ -482,6 +486,32 @@ class _PosCartPaneState extends State<PosCartPane> {
               ),
             ),
           ],
+          ], // <-- Ini adalah penutup untuk blok `if (!widget.isRestockMode) ...[`
+
+          if (widget.isRestockMode) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: const Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.info_outline, size: 15, color: Color(0xFFDC2626)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Daftar belanja ini akan memotong modal awal laci saat toko dibuka.',
+                      style: TextStyle(fontSize: 11, height: 1.4, color: Color(0xFFB91C1C)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
 
           const SizedBox(height: 20),
 
@@ -505,10 +535,12 @@ class _PosCartPaneState extends State<PosCartPane> {
                   : const Icon(Icons.check_circle_outline, size: 18),
               label: Text(
                 widget.isSubmitting
-                    ? 'Memproses Transaksi...'
-                    : (widget.paymentMethod == 'cash'
-                        ? 'Selesaikan Tunai (${_rupiah.format(widget.cartTotal)})'
-                        : 'Selesaikan QRIS (${_rupiah.format(widget.cartTotal)})'),
+                    ? (widget.isRestockMode ? 'Menyimpan...' : 'Memproses Transaksi...')
+                    : (widget.isRestockMode
+                        ? 'Simpan Belanja Pagi'
+                        : (widget.paymentMethod == 'cash'
+                            ? 'Selesaikan Tunai (${_rupiah.format(widget.cartTotal)})'
+                            : 'Selesaikan QRIS (${_rupiah.format(widget.cartTotal)})')),
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ),

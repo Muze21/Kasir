@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class PosCatalogPane extends StatefulWidget {
+  final bool isRestockMode; // Flag untuk mode belanja pagi
   final TextEditingController customerNameCtrl;
   final TextEditingController customNameCtrl;
   final TextEditingController customPriceCtrl;
@@ -14,6 +15,7 @@ class PosCatalogPane extends StatefulWidget {
 
   const PosCatalogPane({
     super.key,
+    this.isRestockMode = false,
     required this.customerNameCtrl,
     required this.customNameCtrl,
     required this.customPriceCtrl,
@@ -60,46 +62,47 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Card Input Nama Pelanggan / No. Meja
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.person_outline, size: 20, color: Color(0xFF64748B)),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: widget.customerNameCtrl,
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        hintText: 'Nama Pelanggan / No. Meja (opsional)',
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
+            // Card Input Nama Pelanggan / No. Meja (Hanya di mode jualan)
+            if (!widget.isRestockMode) ...[
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person_outline, size: 20, color: Color(0xFF64748B)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: widget.customerNameCtrl,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          hintText: 'Nama Pelanggan / No. Meja (opsional)',
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                       ),
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
             // Header Filter Kategori & Chips
             Row(
               children: [
-                const Icon(Icons.grid_view_rounded, size: 16, color: Color(0xFF64748B)),
+                Icon(widget.isRestockMode ? Icons.category_outlined : Icons.grid_view_rounded, size: 16, color: const Color(0xFF64748B)),
                 const SizedBox(width: 6),
-                const Text(
-                  'Katalog Barang Cepat',
-                  style: TextStyle(
+                Text(
+                  widget.isRestockMode ? 'Katalog Bahan Belanja' : 'Katalog Barang Cepat',
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF0F172A),
@@ -118,14 +121,14 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(color: const Color(0xFFCBD5E1)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.tune_rounded, size: 12, color: Color(0xFF334155)),
-                          SizedBox(width: 4),
+                          const Icon(Icons.tune_rounded, size: 12, color: Color(0xFF334155)),
+                          const SizedBox(width: 4),
                           Text(
-                            'Kelola Menu',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
+                            widget.isRestockMode ? 'Kelola Bahan' : 'Kelola Menu',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF334155)),
                           ),
                         ],
                       ),
@@ -155,11 +158,11 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.inventory_2_outlined, size: 32, color: Color(0xFF94A3B8)),
+                      Icon(widget.isRestockMode ? Icons.inventory_2_outlined : Icons.restaurant_menu, size: 32, color: const Color(0xFF94A3B8)),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Belum ada menu di kategori ini.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      Text(
+                        widget.isRestockMode ? 'Belum ada bahan mentah.' : 'Belum ada menu di kategori ini.',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                       ),
                       if (widget.onManageMenu != null) ...[
                         const SizedBox(height: 10),
@@ -170,7 +173,7 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                             visualDensity: VisualDensity.compact,
                           ),
                           icon: const Icon(Icons.add, size: 16),
-                          label: const Text('Tambah Menu Sekarang', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                          label: Text(widget.isRestockMode ? 'Tambah Bahan Sekarang' : 'Tambah Menu Sekarang', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ],
@@ -292,10 +295,10 @@ class _PosCatalogPaneState extends State<PosCatalogPane> {
                             color: const Color(0xFF64748B),
                           ),
                           const SizedBox(width: 8),
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              'Input Barang Manual / Kustom',
-                              style: TextStyle(
+                              widget.isRestockMode ? 'Input Bahan Manual / Kustom' : 'Input Barang Manual / Kustom',
+                              style: const TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF0F172A),

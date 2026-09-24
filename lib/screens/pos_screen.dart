@@ -9,12 +9,20 @@ import '../widgets/pos/pos_catalog_pane.dart';
 import '../widgets/pos/pos_order_history_dialog.dart';
 import '../widgets/pos/pos_ticket_dialog.dart';
 import '../widgets/pos/pos_top_bar.dart';
+import 'manage_material_screen.dart';
 import 'manage_menu_screen.dart';
 import 'report_screen.dart';
 
 class PosScreen extends StatefulWidget {
-  final Shift shift;
-  const PosScreen({super.key, required this.shift});
+  final Shift? shift;
+  final bool isRestockMode;
+
+  const PosScreen({super.key, required this.shift}) : isRestockMode = false;
+
+  // Named constructor khusus untuk mode Catat Belanja Pagi (restok)
+  const PosScreen.restock({super.key})
+      : shift = null,
+        isRestockMode = true;
 
   @override
   State<PosScreen> createState() => _PosScreenState();
@@ -48,33 +56,51 @@ class _PosScreenState extends State<PosScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _loadItems();
     _cashInputCtrl.addListener(() {
       if (mounted) setState(() {});
     });
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadItems() async {
     try {
-      final products = await _db.getProducts();
-      if (!mounted) return;
-      if (products.isNotEmpty) {
-        setState(() {
-          _presetItems = products.map((p) => p.toMap()).toList();
-        });
+      if (widget.isRestockMode) {
+        final materials = await _db.getMaterials();
+        if (!mounted) return;
+        if (materials.isNotEmpty) {
+          setState(() {
+            _presetItems = materials.map((m) => {
+              'name': m.name,
+              'price': m.defaultPrice, // pakai properti default_price dari tabel materials
+            }).toList();
+          });
+        }
+      } else {
+        final products = await _db.getProducts();
+        if (!mounted) return;
+        if (products.isNotEmpty) {
+          setState(() {
+            _presetItems = products.map((p) => p.toMap()).toList();
+          });
+        }
       }
     } catch (_) {
-      // Pertahankan menu fallback jika gagal/offline
+      // Pertahankan fallback jika gagal/offline
     }
   }
 
   void _openManageMenu() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const ManageMenuScreen()),
-    ).then((_) {
-      _loadProducts();
-    });
+    if (widget.isRestockMode) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ManageMaterialScreen()),
+      ).then((_) => _loadItems());
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ManageMenuScreen()),
+      ).then((_) => _loadItems());
+    }
   }
 
   @override
@@ -155,9 +181,15 @@ class _PosScreenState extends State<PosScreen> {
     });
   }
 
-  // Proses Transaksi
+  // Proses Transaksi / Simpan Belanja Pagi
   Future<void> _submitOrder() async {
     if (_cart.isEmpty) return;
+
+    if (widget.isRestockMode) {
+      // Jika restok pagi, return cart ke Dashboard via navigator
+      Navigator.pop(context, _cart);
+      return;
+    }
 
     if (_paymentMethod == 'cash' && _cashReceived < _cartTotal) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -193,7 +225,7 @@ class _PosScreenState extends State<PosScreen> {
       final payMethod = _paymentMethod;
 
       final queueNumber = await _db.createOrder(
-        shiftId: widget.shift.id,
+        shiftId: widget.shift!.id,
         total: totalPaid,
         paymentMethod: payMethod,
         items: orderItems,
@@ -322,6 +354,7 @@ class _PosScreenState extends State<PosScreen> {
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
                     child: PosCartPane(
+                      isRestockMode: widget.isRestockMode,
                       cart: _cart,
                       onClearCart: () {
                         _clearCart();
@@ -384,12 +417,12 @@ class _PosScreenState extends State<PosScreen> {
 
     if (confirm != true || !mounted) return;
     try {
-      await _db.closeShift(widget.shift.id);
+      await _db.closeShift(widget.shift!.id);
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => ReportScreen(shiftId: widget.shift.id, shiftTitle: 'Rekap Sesi Ditutup'),
+          builder: (_) => ReportScreen(shiftId: widget.shift!.id, shiftTitle: 'Rekap Sesi Ditutup'),
         ),
       );
     } catch (e) {
@@ -406,7 +439,7 @@ class _PosScreenState extends State<PosScreen> {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) => PosOrderHistoryDialog(
-          shiftId: widget.shift.id,
+          shiftId: widget.shift!.id,
           isBottomSheet: true,
           onOrderVoided: () {
             if (mounted) setState(() {});
@@ -417,7 +450,7 @@ class _PosScreenState extends State<PosScreen> {
       showDialog(
         context: context,
         builder: (_) => PosOrderHistoryDialog(
-          shiftId: widget.shift.id,
+          shiftId: widget.shift!.id,
           isBottomSheet: false,
           onOrderVoided: () {
             if (mounted) setState(() {});
@@ -430,7 +463,7 @@ class _PosScreenState extends State<PosScreen> {
   void _viewReport() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ReportScreen(shiftId: widget.shift.id)),
+      MaterialPageRoute(builder: (_) => ReportScreen(shiftId: widget.shift!.id)),
     );
   }
 
@@ -440,7 +473,7 @@ class _PosScreenState extends State<PosScreen> {
       builder: (_) => DashboardExpenseDialog(
         onSubmit: (note, amount, category) async {
           await _db.createExpense(
-            shiftId: widget.shift.id,
+            shiftId: widget.shift!.id,
             amount: amount,
             note: note,
             category: category,
@@ -463,13 +496,36 @@ class _PosScreenState extends State<PosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: PosTopBar(
-        shift: widget.shift,
-        onOpenOrderHistory: _openOrderHistory,
-        onAddExpense: _openAddExpense,
-        onViewReport: _viewReport,
-        onCloseShift: _closeShift,
-      ),
+      appBar: widget.isRestockMode
+          ? AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.close, size: 22, color: Color(0xFF0F172A)),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text(
+                'Catat Belanja Pagi',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.4,
+                ),
+              ),
+              bottom: const PreferredSize(
+                preferredSize: Size.fromHeight(1),
+                child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+              ),
+            )
+          : PosTopBar(
+              shift: widget.shift!,
+              onOpenOrderHistory: _openOrderHistory,
+              onAddExpense: _openAddExpense,
+              onViewReport: _viewReport,
+              onCloseShift: _closeShift,
+            ),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 820;
@@ -484,6 +540,7 @@ class _PosScreenState extends State<PosScreen> {
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
                     child: PosCatalogPane(
+                      isRestockMode: widget.isRestockMode,
                       customerNameCtrl: _customerNameCtrl,
                       customNameCtrl: _customNameCtrl,
                       customPriceCtrl: _customPriceCtrl,
@@ -504,6 +561,7 @@ class _PosScreenState extends State<PosScreen> {
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(20),
                     child: PosCartPane(
+                      isRestockMode: widget.isRestockMode,
                       cart: _cart,
                       onClearCart: _clearCart,
                       onUpdateQty: _updateCartQty,
@@ -528,6 +586,7 @@ class _PosScreenState extends State<PosScreen> {
           return SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(16, 16, 16, _cart.isNotEmpty ? 100 : 24),
             child: PosCatalogPane(
+              isRestockMode: widget.isRestockMode,
               customerNameCtrl: _customerNameCtrl,
               customNameCtrl: _customNameCtrl,
               customPriceCtrl: _customPriceCtrl,
@@ -611,7 +670,7 @@ class _PosScreenState extends State<PosScreen> {
                     ),
                   ),
                   const Spacer(),
-                  // Tombol Bayar
+                  // Tombol Bayar / Simpan
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0F172A),
@@ -621,10 +680,10 @@ class _PosScreenState extends State<PosScreen> {
                       elevation: 0,
                     ),
                     onPressed: _openMobileCheckoutSheet,
-                    icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 18),
-                    label: const Text(
-                      'BAYAR ➔',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
+                    icon: Icon(widget.isRestockMode ? Icons.check_circle_outline : Icons.shopping_cart_checkout_rounded, size: 18),
+                    label: Text(
+                      widget.isRestockMode ? 'SIMPAN ➔' : 'BAYAR ➔',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.3),
                     ),
                   ),
                 ],
